@@ -12,14 +12,14 @@ import (
 var assets embed.FS
 
 func main() {
-	// Create an instance of the app structure
 	app := NewApp()
 
-	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  "native-uploader",
-		Width:  1024,
-		Height: 768,
+		Title:     "native-uploader",
+		Width:     1024,
+		Height:    900,
+		MinWidth:  800,
+		MinHeight: 700,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

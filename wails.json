@@ -1,13 +1,14 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "native-uploader",
-  "outputfilename": "native-uploader",
+  "name": "wow-logs-native-uploader",
+  "icon": "build/appicon.png",
+  "outputfilename": "wow-logs-native-uploader",
   "frontend:install": "npm install",
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
   "author": {
-    "name": "Rakesh",
+    "name": "rksdevs",
     "email": "mailto.dev.rakesh@gmail.com"
   }
 }
