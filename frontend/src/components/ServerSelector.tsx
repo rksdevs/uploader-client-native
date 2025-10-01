@@ -20,6 +20,7 @@ const ServerSelector: React.FC<ServerSelectorProps> = ({
     { label: "AstraWow-Wrathion", value: "AstraWow_Wrathion" },
     { label: "AstraWow-Neltharion", value: "AstraWow_Neltharion" },
     { label: "Warmane-Lordaeron", value: "Warmane_Lordaeron" },
+    { label: "Stormforge-Frostmourne-S1", value: "Stormforge_Frostmourne_S1" },
   ];
 
   return (
