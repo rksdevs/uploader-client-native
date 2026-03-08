@@ -6,6 +6,12 @@ export function EnqueueJobs(arg1:number,arg2:Array<main.Instance>):Promise<strin
 
 export function GetSavedDirectory():Promise<string>;
 
+export function GetUploaderServers():Promise<Array<main.UploaderServer>>;
+
+export function OpenAllLogsPage():Promise<void>;
+
+export function OpenLogPage(arg1:number):Promise<void>;
+
 export function PreprocessLog(arg1:string,arg2:string):Promise<main.PreprocessResponse>;
 
 export function SelectDirectory():Promise<string>;

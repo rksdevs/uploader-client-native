@@ -10,6 +10,18 @@ export function GetSavedDirectory() {
   return window['go']['main']['App']['GetSavedDirectory']();
 }
 
+export function GetUploaderServers() {
+  return window['go']['main']['App']['GetUploaderServers']();
+}
+
+export function OpenAllLogsPage() {
+  return window['go']['main']['App']['OpenAllLogsPage']();
+}
+
+export function OpenLogPage(arg1) {
+  return window['go']['main']['App']['OpenLogPage'](arg1);
+}
+
 export function PreprocessLog(arg1, arg2) {
   return window['go']['main']['App']['PreprocessLog'](arg1, arg2);
 }

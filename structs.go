@@ -36,3 +36,14 @@ type LogStatus struct {
 	ID     int    `json:"id"`
 	Status string `json:"status"`
 }
+
+type UploaderServer struct {
+	ID    int    `json:"id"`
+	Value string `json:"value"`
+	Label string `json:"label"`
+}
+
+type UploaderServersResponse struct {
+	Servers []UploaderServer `json:"servers"`
+	Count   int              `json:"count"`
+}

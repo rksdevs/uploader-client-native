@@ -6,6 +6,9 @@ import {
   SelectDirectory,
   StartMonitoringJob,
   GetSavedDirectory,
+  GetUploaderServers,
+  OpenAllLogsPage,
+  OpenLogPage,
 } from "../wailsjs/go/main/App";
 import { main } from "../wailsjs/go/models";
 import { EventsOn } from "../wailsjs/runtime";
@@ -13,10 +16,10 @@ import { toast } from "sonner";
 
 import StatusDisplay from "./components/StatusDisplay";
 import DirectorySelector from "./components/DirectorySelector";
-import ServerSelector from "./components/ServerSelector";
+import ServerSelector, { ServerOption } from "./components/ServerSelector";
 import UploadButton from "./components/UploadButton";
 import InstanceSelector from "./components/InstanceSelector";
-import { PreprocessResponse, Instance, JobNotification } from "./types";
+import { Instance, JobNotification } from "./types";
 
 function App() {
   const [logDirectory, setLogDirectory] = useState<string>("");
@@ -28,10 +31,11 @@ function App() {
   const [view, setView] = useState<"upload" | "select">("upload");
   const [preprocessId, setPreprocessId] = useState<number | null>(null);
   const [instances, setInstances] = useState<Instance[]>([]);
+  const [serverOptions, setServerOptions] = useState<ServerOption[]>([]);
 
   useEffect(() => {
     GetSavedDirectory()
-      .then((savedPath: any) => {
+      .then((savedPath: string) => {
         if (savedPath) {
           setLogDirectory(savedPath);
           setStatusMessage(`Monitoring logs in: ${savedPath}`);
@@ -39,11 +43,23 @@ function App() {
           setStatusMessage("Please select your WoW Logs directory to begin.");
         }
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         console.error("[React App] Error getting saved directory:", err);
         setStatusMessage(
           "Could not load settings. Please select your WoW Logs directory."
         );
+      });
+
+    GetUploaderServers()
+      .then((servers: ServerOption[]) => {
+        if (!Array.isArray(servers) || servers.length === 0) {
+          return;
+        }
+        setServerOptions(servers);
+      })
+      .catch((err: unknown) => {
+        console.error("[React App] Error fetching uploader servers:", err);
+        toast.error("Failed to fetch latest server list.");
       });
   }, []);
 
@@ -55,8 +71,7 @@ function App() {
           action: {
             label: "View Log",
             onClick: () => {
-              const reportUrl = `${data.viewLogURL}/${data.logId}`;
-              window.open(reportUrl, "_blank");
+              OpenLogPage(data.logId);
             },
           },
         });
@@ -83,7 +98,7 @@ function App() {
       })
       .catch((err) => {
         setStatusMessage("Error: Could not select directory.");
-        toast.error("Could not select directory", { description: err });
+        toast.error("Could not select directory", { description: String(err) });
       });
   };
 
@@ -109,7 +124,7 @@ function App() {
       })
       .catch((err) => {
         setStatusMessage(`Error: ${err}`);
-        toast.error("Failed to preprocess log", { description: err });
+        toast.error("Failed to preprocess log", { description: String(err) });
       })
       .finally(() => {
         setIsProcessing(false);
@@ -136,11 +151,19 @@ function App() {
       })
       .catch((err) => {
         setStatusMessage(`Error: ${err}`);
-        toast.error("Failed to queue jobs", { description: err });
+        toast.error("Failed to queue jobs", { description: String(err) });
       })
       .finally(() => {
         setIsProcessing(false);
       });
+  };
+
+  const handleViewAllLogs = () => {
+    try {
+      OpenAllLogsPage();
+    } catch (err) {
+      toast.error("Failed to open all logs page", { description: String(err) });
+    }
   };
 
   const resetToUploadView = () => {
@@ -169,12 +192,22 @@ function App() {
               selectedValue={selectedServer}
               onSelect={setSelectedServer}
               disabled={isProcessing}
+              serverOptions={serverOptions}
             />
-            <UploadButton
-              onUpload={handlePreprocess}
-              disabled={isProcessing || !logDirectory || !selectedServer}
-              isProcessing={isProcessing}
-            />
+            <div className="action-row">
+              <UploadButton
+                onUpload={handlePreprocess}
+                disabled={isProcessing || !logDirectory || !selectedServer}
+                isProcessing={isProcessing}
+              />
+              <button
+                className="btn btn-secondary"
+                onClick={handleViewAllLogs}
+                disabled={isProcessing}
+              >
+                View All Logs
+              </button>
+            </div>
           </>
         ) : (
           <InstanceSelector
@@ -190,3 +223,5 @@ function App() {
 }
 
 export default App;
+
+

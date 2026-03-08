@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 
 type Config struct {
 	LogDirectory string `json:"logDirectory"`
+	AllLogsURL   string `json:"allLogsURL,omitempty"`
 }
 
 type App struct {
@@ -30,6 +32,22 @@ type App struct {
 	pollLock     sync.Mutex
 	config       Config
 	configPath   string
+}
+
+func fallbackUploaderServers() []UploaderServer {
+	return []UploaderServer{
+		{ID: 0, Value: "Whitemane_Frostmourne", Label: "Whitemane-Frostmourne"},
+		{ID: 0, Value: "Warmane_Icecrown", Label: "Warmane-Icecrown"},
+		{ID: 0, Value: "Warmane_Onyxia", Label: "Warmane-Onyxia"},
+		{ID: 0, Value: "Sunwell", Label: "Sunwell"},
+		{ID: 0, Value: "AstraWow_Wrathion", Label: "AstraWow-Wrathion"},
+		{ID: 0, Value: "AstraWow_Neltharion", Label: "AstraWow-Neltharion"},
+		{ID: 0, Value: "Warmane_Lordaeron", Label: "Warmane-Lordaeron"},
+		{ID: 0, Value: "Stormforge_Frostmourne_S1", Label: "Stormforge-Frostmourne-S1"},
+		{ID: 0, Value: "Freedom_Wow", Label: "Freedom-Wow"},
+		{ID: 0, Value: "Rising_Gods", Label: "Rising-Gods"},
+		{ID: 0, Value: "Chromiecraft", Label: "Chromiecraft"},
+	}
 }
 
 func NewApp() *App {
@@ -297,4 +315,50 @@ func (a *App) checkJobStatus(preprocessId int) (*JobStatusResponse, error) {
 
 	statusResponse.ViewLogURL = a.viewLogURL
 	return &statusResponse, nil
+}
+
+func (a *App) GetUploaderServers() []UploaderServer {
+	apiURL := fmt.Sprintf("%s/api/v5/uploader/servers", a.apiBaseURL)
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	resp, err := client.Get(apiURL)
+	if err != nil {
+		log.Printf("[Go Backend] Failed to fetch uploader servers, using fallback: %v\n", err)
+		return fallbackUploaderServers()
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("[Go Backend] Server list API returned %s, using fallback\n", resp.Status)
+		return fallbackUploaderServers()
+	}
+
+	var payload UploaderServersResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		log.Printf("[Go Backend] Failed to decode uploader server list, using fallback: %v\n", err)
+		return fallbackUploaderServers()
+	}
+
+	if len(payload.Servers) == 0 {
+		return fallbackUploaderServers()
+	}
+
+	return payload.Servers
+}
+
+func (a *App) OpenLogPage(logId int) {
+	if logId <= 0 {
+		return
+	}
+	logURL := fmt.Sprintf("%s/%d", strings.TrimRight(a.viewLogURL, "/"), logId)
+	runtime.BrowserOpenURL(a.ctx, logURL)
+}
+
+func (a *App) OpenAllLogsPage() {
+	allLogsURL := strings.TrimSpace(a.config.AllLogsURL)
+	if allLogsURL == "" {
+		allLogsURL = fmt.Sprintf("%s/all-logs", strings.TrimRight(a.viewLogURL, "/"))
+	}
+
+	runtime.BrowserOpenURL(a.ctx, allLogsURL)
 }
