@@ -23,7 +23,7 @@ import (
 type Config struct {
 	LogDirectory            string `json:"logDirectory"`
 	AllLogsURL              string `json:"allLogsURL,omitempty"`
-	AddonSavedVariablesPath string `json:"addonSavedVariablesPath,omitempty"`
+	WowDirectory            string `json:"wowDirectory,omitempty"`
 	ApiToken                string `json:"apiToken,omitempty"`
 	ApiTokenType            string `json:"apiTokenType,omitempty"` // "personal" or "guild"
 	FollowedPlayers         string `json:"followedPlayers,omitempty"` // comma-separated player names
@@ -121,8 +121,8 @@ func (a *App) GetSavedDirectory() string {
 	return a.config.LogDirectory
 }
 
-func (a *App) GetAddonSavedVariablesPath() string {
-	return a.config.AddonSavedVariablesPath
+func (a *App) GetWowDirectory() string {
+	return a.config.WowDirectory
 }
 
 func (a *App) SelectDirectory() (string, error) {
@@ -142,24 +142,21 @@ func (a *App) SelectDirectory() (string, error) {
 	return directory, nil
 }
 
-func (a *App) SelectAddonSavedVariablesFile() (string, error) {
-	file, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
-		Title: "Select WowLogsAddon.lua (SavedVariables)",
-		Filters: []runtime.FileFilter{
-			{DisplayName: "Lua Files", Pattern: "*.lua"},
-		},
+func (a *App) SelectWowDirectory() (string, error) {
+	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Select WoW Directory (e.g. World of Warcraft 3.3.5a)",
 	})
 	if err != nil {
 		return "", err
 	}
-	if file != "" {
-		log.Printf("[Go Backend] User selected addon SavedVariables file: %s\n", file)
-		a.config.AddonSavedVariablesPath = file
+	if dir != "" {
+		log.Printf("[Go Backend] User selected WoW directory: %s\n", dir)
+		a.config.WowDirectory = dir
 		if err := a.saveConfig(); err != nil {
 			log.Printf("[Go Backend] ERROR: Failed to save config: %v\n", err)
 		}
 	}
-	return file, nil
+	return dir, nil
 }
 
 func (a *App) PreprocessLog(logDirectory string, serverName string) (*PreprocessResponse, error) {
@@ -718,9 +715,27 @@ func (a *App) UpdateAddonRankings(serverName string, season int) (string, error)
 	if strings.TrimSpace(serverName) == "" {
 		return "", fmt.Errorf("server is required")
 	}
-	addonPath := strings.TrimSpace(a.config.AddonSavedVariablesPath)
-	if addonPath == "" {
-		return "", fmt.Errorf("addon SavedVariables file is not configured")
+	wowDir := strings.TrimSpace(a.config.WowDirectory)
+	if wowDir == "" {
+		return "", fmt.Errorf("wow directory is not configured")
+	}
+
+	accountDir := filepath.Join(wowDir, "WTF", "Account")
+	entries, err := os.ReadDir(accountDir)
+	if err != nil {
+		return "", fmt.Errorf("could not read account directory (%s): %w", accountDir, err)
+	}
+
+	var accountPaths []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			svDir := filepath.Join(accountDir, entry.Name(), "SavedVariables")
+			accountPaths = append(accountPaths, filepath.Join(svDir, "WowLogsAddon.lua"))
+		}
+	}
+
+	if len(accountPaths) == 0 {
+		return "", fmt.Errorf("no accounts found in %s", accountDir)
 	}
 
 	q := url.Values{}
@@ -766,15 +781,32 @@ func (a *App) UpdateAddonRankings(serverName string, season int) (string, error)
 	}
 
 	luaData := buildSavedVariablesLua(&payload)
-	if err := os.WriteFile(addonPath, []byte(luaData), 0644); err != nil {
-		return "", fmt.Errorf("failed to write addon SavedVariables file: %w", err)
+	
+	successCount := 0
+	for _, path := range accountPaths {
+		svDir := filepath.Dir(path)
+		if err := os.MkdirAll(svDir, os.ModePerm); err != nil {
+			log.Printf("[Go Backend] Could not create directory %s: %v\n", svDir, err)
+			continue
+		}
+
+		if err := os.WriteFile(path, []byte(luaData), 0644); err != nil {
+			log.Printf("[Go Backend] Failed to write to %s: %v\n", path, err)
+		} else {
+			log.Printf("[Go Backend] Successfully updated rankings at %s\n", path)
+			successCount++
+		}
+	}
+
+	if successCount == 0 {
+		return "", fmt.Errorf("failed to write addon file to any account directory")
 	}
 
 	premiumSuffix := ""
 	if payload.IsPremium {
 		premiumSuffix = " [Premium ✓]"
 	}
-	return fmt.Sprintf("Updated %d points rows and %d performance rows for %s (Season %d)%s.\n\n⚠️ Please LOGOUT and log back in (do NOT use /reload — it will overwrite the file).", payload.PointsCount, payload.PerformanceCount, payload.Realm, payload.Season, premiumSuffix), nil
+	return fmt.Sprintf("Updated %d points rows and %d performance rows for %s (Season %d)%s.\n\nSuccessfully synced to %d account(s).\n\n⚠️ Please LOGOUT and log back in (do NOT use /reload if installing for the first time).", payload.PointsCount, payload.PerformanceCount, payload.Realm, payload.Season, premiumSuffix, successCount), nil
 }
 
 // GetPremiumConfig returns current premium settings (token type, token, and followed players)

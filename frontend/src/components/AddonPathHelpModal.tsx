@@ -9,12 +9,7 @@ const AddonPathHelpModal: React.FC<AddonPathHelpModalProps> = ({ isOpen, onClose
   if (!isOpen) return null;
 
   const pathSegments = [
-    { label: 'WoW Folder', example: 'E:\\World of Warcraft 3.3.5a', color: '#6366f1' },
-    { label: 'WTF', example: 'WTF', color: '#8b5cf6' },
-    { label: 'Account', example: 'Account', color: '#8b5cf6' },
-    { label: 'Your Account Name', example: 'MYACCOUNT', color: '#ec4899' },
-    { label: 'SavedVariables', example: 'SavedVariables', color: '#8b5cf6' },
-    { label: 'Addon File', example: 'WowLogsAddon.lua', color: '#10b981' },
+    { label: 'WoW Folder', example: 'World of Warcraft 3.3.5a', color: '#10b981' },
   ];
 
   return (
@@ -52,10 +47,10 @@ const AddonPathHelpModal: React.FC<AddonPathHelpModalProps> = ({ isOpen, onClose
             <span style={{ fontSize: '1.3rem' }}>📂</span>
             <div>
               <div style={{ color: '#fff', fontWeight: 700, fontSize: '1rem' }}>
-                How to Select the Addon File
+                How to Link your WoW Client
               </div>
               <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.78rem', marginTop: '2px' }}>
-                Follow these steps to locate WowLogsAddon.lua
+                Point the app to your base game folder
               </div>
             </div>
           </div>
@@ -81,7 +76,7 @@ const AddonPathHelpModal: React.FC<AddonPathHelpModalProps> = ({ isOpen, onClose
         {/* Path breakdown */}
         <div style={{ padding: '18px 20px' }}>
           <p style={{ margin: '0 0 14px', fontSize: '0.85rem', color: '#6b7280' }}>
-            Navigate to your <strong>WoW installation folder</strong> and follow the path below:
+            Simply select the <strong>folder where your wow.exe is located</strong>. The Uploader will automatically find all your accounts and sync to them.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -133,10 +128,10 @@ const AddonPathHelpModal: React.FC<AddonPathHelpModalProps> = ({ isOpen, onClose
             padding: '10px 12px',
           }}>
             <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Full Path Example
+              Directory Example
             </div>
             <code style={{ fontSize: '0.75rem', color: '#475569', wordBreak: 'break-all', lineHeight: 1.6 }}>
-              E:\World of Warcraft 3.3.5a\WTF\Account\<span style={{ color: '#ec4899', fontWeight: 700 }}>MYACCOUNT</span>\SavedVariables\WowLogsAddon.lua
+              E:\World of Warcraft 3.3.5a
             </code>
           </div>
 
@@ -149,7 +144,7 @@ const AddonPathHelpModal: React.FC<AddonPathHelpModalProps> = ({ isOpen, onClose
             fontSize: '0.8rem',
             color: '#1e40af',
           }}>
-            💡 Replace <strong>MYACCOUNT</strong> with your actual Battle.net / WoW account folder name.
+            💡 <strong>Auto-Syncing:</strong> Once linked, when you click "Update Rankings", the app will inject the data into <strong>every account</strong> folder inside your WTF folder automatically!
           </div>
         </div>
 

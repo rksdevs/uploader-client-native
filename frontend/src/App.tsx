@@ -9,8 +9,8 @@ import {
   GetUploaderServers,
   OpenAllLogsPage,
   OpenLogPage,
-  GetAddonSavedVariablesPath,
-  SelectAddonSavedVariablesFile,
+  GetWowDirectory,
+  SelectWowDirectory,
   UpdateAddonRankings,
   GetPremiumConfig,
   SavePremiumConfig,
@@ -45,7 +45,7 @@ function App() {
   const [preprocessId, setPreprocessId] = useState<number | null>(null);
   const [instances, setInstances] = useState<Instance[]>([]);
   const [serverOptions, setServerOptions] = useState<ServerOption[]>([]);
-  const [addonSavedVariablesPath, setAddonSavedVariablesPath] = useState<string>("");
+  const [wowDirectory, setWowDirectory] = useState<string>("");
   const [showPremiumSettings, setShowPremiumSettings] = useState<boolean>(false);
   const [apiToken, setApiToken] = useState<string>("");
   const [apiTokenType, setApiTokenType] = useState<string>("personal");
@@ -83,14 +83,14 @@ function App() {
         toast.error("Failed to fetch latest server list.");
       });
 
-    GetAddonSavedVariablesPath()
+    GetWowDirectory()
       .then((savedPath: string) => {
         if (savedPath) {
-          setAddonSavedVariablesPath(savedPath);
+          setWowDirectory(savedPath);
         }
       })
       .catch((err: unknown) => {
-        console.error("[React App] Error loading addon SavedVariables path:", err);
+        console.error("[React App] Error loading WoW directory path:", err);
       });
 
     GetPremiumConfig()
@@ -143,16 +143,16 @@ function App() {
       });
   };
 
-  const handleSelectAddonSavedVariables = () => {
-    SelectAddonSavedVariablesFile()
-      .then((selectedPath) => {
+  const handleSelectWowDirectory = () => {
+    SelectWowDirectory()
+      .then((selectedPath: string) => {
         if (selectedPath) {
-          setAddonSavedVariablesPath(selectedPath);
-          toast.success("Addon SavedVariables file selected.");
+          setWowDirectory(selectedPath);
+          toast.success("WoW Directory selected.");
         }
       })
-      .catch((err) => {
-        toast.error("Could not select addon SavedVariables file", {
+      .catch((err: unknown) => {
+        toast.error("Could not select WoW Directory", {
           description: String(err),
         });
       });
@@ -312,7 +312,7 @@ function App() {
             />
 
             <div className="addon-path-hint" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              Addon DB: {addonSavedVariablesPath || <span style={{ opacity: 0.7, fontSize: '11px' }}>&lt;wow-directory&gt;/WTF/Account/&lt;Account Name&gt;/SavedVariables/WowLogsAddon.lua</span>}
+              WoW Folder (Auto-Syncs all accounts): {wowDirectory || <span style={{ opacity: 0.7, fontSize: '11px' }}>&lt;wow-directory&gt; (e.g. E:\World of Warcraft 3.3.5a)</span>}
               <button 
                 onClick={() => setShowAddonHelp(true)}
                 style={{ 
@@ -424,11 +424,13 @@ function App() {
 
             <div className="action-row">
               <button
-                className="btn btn-secondary"
-                onClick={handleSelectAddonSavedVariables}
+                className="btn btn-secondary w-full select-wow-btn"
+                onClick={handleSelectWowDirectory}
                 disabled={isProcessing || isUpdatingRankings}
               >
-                Select Addon File
+                {!wowDirectory
+                    ? "Link WoW Directory"
+                    : "Change WoW Directory"}
               </button>
               <button
                 className="upload-button"
@@ -437,7 +439,7 @@ function App() {
                   isProcessing ||
                   isUpdatingRankings ||
                   !selectedServer ||
-                  !addonSavedVariablesPath
+                  !wowDirectory
                 }
               >
                 {isUpdatingRankings ? "Updating Rankings..." : "Update Rankings"}

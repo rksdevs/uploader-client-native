@@ -6,10 +6,6 @@ export function EnqueueJobs(arg1, arg2) {
   return window['go']['main']['App']['EnqueueJobs'](arg1, arg2);
 }
 
-export function GetAddonSavedVariablesPath() {
-  return window['go']['main']['App']['GetAddonSavedVariablesPath']();
-}
-
 export function GetPremiumConfig() {
   return window['go']['main']['App']['GetPremiumConfig']();
 }
@@ -20,6 +16,10 @@ export function GetSavedDirectory() {
 
 export function GetUploaderServers() {
   return window['go']['main']['App']['GetUploaderServers']();
+}
+
+export function GetWowDirectory() {
+  return window['go']['main']['App']['GetWowDirectory']();
 }
 
 export function OpenAllLogsPage() {
@@ -38,12 +38,12 @@ export function SavePremiumConfig(arg1, arg2, arg3) {
   return window['go']['main']['App']['SavePremiumConfig'](arg1, arg2, arg3);
 }
 
-export function SelectAddonSavedVariablesFile() {
-  return window['go']['main']['App']['SelectAddonSavedVariablesFile']();
-}
-
 export function SelectDirectory() {
   return window['go']['main']['App']['SelectDirectory']();
+}
+
+export function SelectWowDirectory() {
+  return window['go']['main']['App']['SelectWowDirectory']();
 }
 
 export function StartMonitoringJob(arg1) {
