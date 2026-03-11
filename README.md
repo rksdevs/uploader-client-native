@@ -6,17 +6,24 @@ This application is built with **[Wails](https://wails.io)** (Go + React/TypeScr
 
 ---
 
-## ✨ Features
+## Features
 
+### v2.0.0 (Latest Release)
+- **In-Game Ranking Sync** – Automatically updates the WoW Addon with the latest rankings and premium performance data.
+- **Premium Settings** – Securely manage your Personal and Guild API Tokens.
+- **Performance Trends** – Sync advanced parse metrics like percentile gains/dips and latest dates to your addon.
+- **Followed Players** – Keep track of specific players by adding them to your followers list.
+- **CSV String Serialization** – Supports ultra-fast syncing of massive data payloads (13MB+) to the WoW Addon.
+
+### Core Features
 - **Persistent Directory** – Save your WoW Logs folder path once and reuse it automatically.
 - **Multi-Instance Support** – Detect and process multiple raid instances from a single combat log.
 - **Real-time Notifications** – Desktop alerts for upload progress and completion.
 - **Cross-Platform** – A single codebase for both Windows and macOS.
-- **Downloadable Exe file** – Available for Windows currently, For Mac, I will release soon.
 
 ---
 
-## ⚙️ Development Setup
+## Development Setup
 
 ### Prerequisites
 
@@ -51,7 +58,7 @@ wails dev
 
 ---
 
-## 📦 Building for Production
+## Building for Production
 
 ### Windows (.exe)
 
@@ -73,7 +80,7 @@ Output: `build/bin/wow-logs-native-uploader.app` (zip before distributing).
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 - **Framework**: Wails v2
 - **Backend**: Go
@@ -82,7 +89,7 @@ Output: `build/bin/wow-logs-native-uploader.app` (zip before distributing).
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome!
 
@@ -103,6 +110,6 @@ Contributions are welcome!
 
 ---
 
-## 📌 About
+## About
 
 This client is the **official companion app** for [wow-logs.co.in](https://wow-logs.co.in).

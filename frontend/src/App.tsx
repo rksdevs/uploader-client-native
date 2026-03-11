@@ -9,9 +9,19 @@ import {
   GetUploaderServers,
   OpenAllLogsPage,
   OpenLogPage,
+  GetAddonSavedVariablesPath,
+  SelectAddonSavedVariablesFile,
+  UpdateAddonRankings,
+  GetPremiumConfig,
+  SavePremiumConfig,
 } from "../wailsjs/go/main/App";
 import { main } from "../wailsjs/go/models";
-import { EventsOn } from "../wailsjs/runtime";
+import {
+  EventsOn,
+  EventsOff,
+  LogInfo,
+  BrowserOpenURL,
+} from "../wailsjs/runtime";
 import { toast } from "sonner";
 
 import StatusDisplay from "./components/StatusDisplay";
@@ -19,6 +29,8 @@ import DirectorySelector from "./components/DirectorySelector";
 import ServerSelector, { ServerOption } from "./components/ServerSelector";
 import UploadButton from "./components/UploadButton";
 import InstanceSelector from "./components/InstanceSelector";
+import ConfirmationModal from "./components/ConfirmationModal";
+import AddonPathHelpModal from "./components/AddonPathHelpModal";
 import { Instance, JobNotification } from "./types";
 
 function App() {
@@ -28,10 +40,19 @@ function App() {
     "Loading saved settings..."
   );
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isUpdatingRankings, setIsUpdatingRankings] = useState<boolean>(false);
   const [view, setView] = useState<"upload" | "select">("upload");
   const [preprocessId, setPreprocessId] = useState<number | null>(null);
   const [instances, setInstances] = useState<Instance[]>([]);
   const [serverOptions, setServerOptions] = useState<ServerOption[]>([]);
+  const [addonSavedVariablesPath, setAddonSavedVariablesPath] = useState<string>("");
+  const [showPremiumSettings, setShowPremiumSettings] = useState<boolean>(false);
+  const [apiToken, setApiToken] = useState<string>("");
+  const [apiTokenType, setApiTokenType] = useState<string>("personal");
+  const [followedPlayers, setFollowedPlayers] = useState<string>("");
+  const [isSavingPremium, setIsSavingPremium] = useState<boolean>(false);
+  const [showClearConfirm, setShowClearConfirm] = useState<boolean>(false);
+  const [showAddonHelp, setShowAddonHelp] = useState<boolean>(false);
 
   useEffect(() => {
     GetSavedDirectory()
@@ -60,6 +81,26 @@ function App() {
       .catch((err: unknown) => {
         console.error("[React App] Error fetching uploader servers:", err);
         toast.error("Failed to fetch latest server list.");
+      });
+
+    GetAddonSavedVariablesPath()
+      .then((savedPath: string) => {
+        if (savedPath) {
+          setAddonSavedVariablesPath(savedPath);
+        }
+      })
+      .catch((err: unknown) => {
+        console.error("[React App] Error loading addon SavedVariables path:", err);
+      });
+
+    GetPremiumConfig()
+      .then((cfg: Record<string, string>) => {
+        if (cfg.apiToken) setApiToken(cfg.apiToken);
+        if (cfg.apiTokenType) setApiTokenType(cfg.apiTokenType);
+        if (cfg.followedPlayers) setFollowedPlayers(cfg.followedPlayers);
+      })
+      .catch((err: unknown) => {
+        console.error("[React App] Error loading premium config:", err);
       });
   }, []);
 
@@ -100,6 +141,81 @@ function App() {
         setStatusMessage("Error: Could not select directory.");
         toast.error("Could not select directory", { description: String(err) });
       });
+  };
+
+  const handleSelectAddonSavedVariables = () => {
+    SelectAddonSavedVariablesFile()
+      .then((selectedPath) => {
+        if (selectedPath) {
+          setAddonSavedVariablesPath(selectedPath);
+          toast.success("Addon SavedVariables file selected.");
+        }
+      })
+      .catch((err) => {
+        toast.error("Could not select addon SavedVariables file", {
+          description: String(err),
+        });
+      });
+  };
+
+  const handleUpdateRankings = () => {
+    if (!selectedServer) {
+      toast.error("Select a server before updating rankings.");
+      return;
+    }
+
+    setIsUpdatingRankings(true);
+    UpdateAddonRankings(selectedServer, 0)
+      .then((message) => {
+        toast.success(message, {
+          description: "Run /reload in-game to load fresh rankings.",
+          duration: 12000,
+        });
+      })
+      .catch((err) => {
+        toast.error("Failed to update addon rankings", {
+          description: String(err),
+        });
+      })
+      .finally(() => setIsUpdatingRankings(false));
+  };
+
+  const handleSavePremiumConfig = () => {
+    setIsSavingPremium(true);
+    SavePremiumConfig(apiToken, apiTokenType, followedPlayers)
+      .then(() => {
+        toast.success("Premium settings saved!", {
+          description: apiToken
+            ? `Token type: ${apiTokenType}. Followed players: ${followedPlayers || "none"}`
+            : "No token set — running in free mode.",
+        });
+        setShowPremiumSettings(false);
+      })
+      .catch((err) => {
+        toast.error("Failed to save premium settings", { description: String(err) });
+      })
+      .finally(() => setIsSavingPremium(false));
+  };
+
+  const handleClearPremiumConfig = () => {
+    setShowClearConfirm(true);
+  };
+
+  const confirmClear = () => {
+    setShowClearConfirm(false);
+    setIsSavingPremium(true);
+    SavePremiumConfig("", "personal", "")
+      .then(() => {
+        setApiToken("");
+        setApiTokenType("personal");
+        setFollowedPlayers("");
+        toast.success("Premium settings cleared.");
+        setShowPremiumSettings(false);
+      })
+      .catch((err) => {
+        toast.error("Failed to clear premium settings", { description: String(err) });
+      })
+      .finally(() => setIsSavingPremium(false));
   };
 
   const handlePreprocess = () => {
@@ -186,14 +302,148 @@ function App() {
             <StatusDisplay message={statusMessage} />
             <DirectorySelector
               onSelect={handleSelectDirectory}
-              disabled={isProcessing}
+              disabled={isProcessing || isUpdatingRankings}
             />
             <ServerSelector
               selectedValue={selectedServer}
               onSelect={setSelectedServer}
-              disabled={isProcessing}
+              disabled={isProcessing || isUpdatingRankings}
               serverOptions={serverOptions}
             />
+
+            <div className="addon-path-hint" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              Addon DB: {addonSavedVariablesPath || <span style={{ opacity: 0.7, fontSize: '11px' }}>&lt;wow-directory&gt;/WTF/Account/&lt;Account Name&gt;/SavedVariables/WowLogsAddon.lua</span>}
+              <button 
+                onClick={() => setShowAddonHelp(true)}
+                style={{ 
+                  background: "none", 
+                  border: "none", 
+                  cursor: "pointer", 
+                  padding: "0",
+                  lineHeight: 0,
+                  opacity: 0.6,
+                  transition: "opacity 0.15s",
+                }}
+                title="How to find this file"
+                onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
+                onMouseLeave={e => (e.currentTarget.style.opacity = "0.6")}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="8.01"/>
+                  <line x1="12" y1="12" x2="12" y2="16"/>
+                </svg>
+              </button>
+              {apiToken && <span className="premium-badge"> ★ Premium</span>}
+            </div>
+
+            <div className="premium-settings-section">
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setShowPremiumSettings(!showPremiumSettings)}
+              >
+                {showPremiumSettings ? "▲ Hide Premium Settings" : "▼ Premium Settings"}
+              </button>
+
+              {showPremiumSettings && (
+                <div className="premium-panel">
+                  <p className="premium-info">
+                    Enter your API token from <strong>wow-logs.co.in</strong> to enable premium features
+                    (performance trends, custom player list).
+                  </p>
+                  
+                  <div className="token-warning" style={{ 
+                    fontSize: "0.8rem", 
+                    color: "#854d0e", 
+                    marginBottom: "1rem", 
+                    backgroundColor: "#fefce8", 
+                    padding: "10px", 
+                    borderRadius: "6px",
+                    border: "1px solid #fef08a"
+                  }}>
+                    ⚠️ <strong>Do not share your generated token.</strong> Treat it as a Secret key bound to your account. Sharing it publicly might lead to compromising your account details.
+                  </div>
+
+                  <div className="form-group">
+                    <label>Token Type</label>
+                    <select
+                      value={apiTokenType}
+                      onChange={(e) => setApiTokenType(e.target.value)}
+                      className="form-select"
+                    >
+                      <option value="personal">Personal</option>
+                      <option value="guild">Guild</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label>API Token</label>
+                    <input
+                      type="password"
+                      className="form-input"
+                      value={apiToken}
+                      onChange={(e) => setApiToken(e.target.value)}
+                      placeholder="Paste your token from your profile / guild dashboard..."
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Followed Players <span className="label-hint">(comma-separated, max 5)</span></label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={followedPlayers}
+                      onChange={(e) => setFollowedPlayers(e.target.value)}
+                      placeholder="e.g. Arthas, Sylvanas, Thrall"
+                    />
+                  </div>
+
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleSavePremiumConfig}
+                      disabled={isSavingPremium}
+                      style={{ flex: 1 }}
+                    >
+                      {isSavingPremium ? "Saving..." : "Save Settings"}
+                    </button>
+                    {apiToken && (
+                      <button
+                        className="btn btn-secondary"
+                        onClick={handleClearPremiumConfig}
+                        disabled={isSavingPremium}
+                        style={{ flex: 1, backgroundColor: "#fee2e2", color: "#991b1b", border: "1px solid #fecaca" }}
+                      >
+                        Clear Data
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="action-row">
+              <button
+                className="btn btn-secondary"
+                onClick={handleSelectAddonSavedVariables}
+                disabled={isProcessing || isUpdatingRankings}
+              >
+                Select Addon File
+              </button>
+              <button
+                className="upload-button"
+                onClick={handleUpdateRankings}
+                disabled={
+                  isProcessing ||
+                  isUpdatingRankings ||
+                  !selectedServer ||
+                  !addonSavedVariablesPath
+                }
+              >
+                {isUpdatingRankings ? "Updating Rankings..." : "Update Rankings"}
+              </button>
+            </div>
+
             <div className="action-row">
               <UploadButton
                 onUpload={handlePreprocess}
@@ -203,7 +453,7 @@ function App() {
               <button
                 className="btn btn-secondary"
                 onClick={handleViewAllLogs}
-                disabled={isProcessing}
+                disabled={isProcessing || isUpdatingRankings}
               >
                 View All Logs
               </button>
@@ -217,11 +467,53 @@ function App() {
             isProcessing={isProcessing}
           />
         )}
+
+        <div className="footer-links" style={{ 
+          marginTop: "30px", 
+          textAlign: "center", 
+          borderTop: "1px solid #eef2f6", 
+          paddingTop: "15px",
+          display: "flex",
+          justifyContent: "center",
+          gap: "20px",
+          opacity: 0.9
+        }}>
+          <a
+            href="#"
+            style={{ 
+              color: "#312e81", 
+              fontSize: "12px", 
+              fontWeight: "600",
+              textDecoration: "underline",
+              letterSpacing: "0.3px"
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              BrowserOpenURL("https://github.com/rksdevs/wow-logs-addon/releases/latest");
+            }}
+          >
+            Download Latest WoW Addon
+          </a>
+        </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={showClearConfirm}
+        title="Clear Premium Settings?"
+        message="Are you sure you want to clear all premium settings? This will remove your API token and followed players list from this device."
+        confirmText="Clear Everything"
+        cancelText="Keep Settings"
+        onConfirm={confirmClear}
+        onCancel={() => setShowClearConfirm(false)}
+        isDestructive={true}
+      />
+
+      <AddonPathHelpModal
+        isOpen={showAddonHelp}
+        onClose={() => setShowAddonHelp(false)}
+      />
     </div>
   );
 }
 
 export default App;
-
-

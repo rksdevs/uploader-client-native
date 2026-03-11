@@ -7,8 +7,12 @@
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
-  "author": {
-    "name": "rksdevs",
-    "email": "mailto.dev.rakesh@gmail.com"
+  "info": {
+    "version": "2.0.0",
+    "copyright": "rksdevs",
+    "author": {
+      "name": "rksdevs",
+      "email": "mailto.dev.rakesh@gmail.com"
+    }
   }
 }

@@ -4,6 +4,10 @@ import {main} from '../models';
 
 export function EnqueueJobs(arg1:number,arg2:Array<main.Instance>):Promise<string>;
 
+export function GetAddonSavedVariablesPath():Promise<string>;
+
+export function GetPremiumConfig():Promise<Record<string, string>>;
+
 export function GetSavedDirectory():Promise<string>;
 
 export function GetUploaderServers():Promise<Array<main.UploaderServer>>;
@@ -14,6 +18,12 @@ export function OpenLogPage(arg1:number):Promise<void>;
 
 export function PreprocessLog(arg1:string,arg2:string):Promise<main.PreprocessResponse>;
 
+export function SavePremiumConfig(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function SelectAddonSavedVariablesFile():Promise<string>;
+
 export function SelectDirectory():Promise<string>;
 
 export function StartMonitoringJob(arg1:number):Promise<void>;
+
+export function UpdateAddonRankings(arg1:string,arg2:number):Promise<string>;
