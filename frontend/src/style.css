@@ -1,5 +1,6 @@
 html {
-    background: linear-gradient(180deg, #eef3ff 0%, #f8fafc 100%);
+    background: var(--header-grad);
+    min-height: 100vh;
 }
 
 body {

@@ -16,7 +16,7 @@ const AddonPathHelpModal: React.FC<AddonPathHelpModalProps> = ({ isOpen, onClose
     <div style={{
       position: 'fixed',
       inset: 0,
-      backgroundColor: 'rgba(0,0,0,0.45)',
+      backgroundColor: 'var(--modal-overlay)',
       backdropFilter: 'blur(3px)',
       display: 'flex',
       alignItems: 'center',
@@ -26,12 +26,12 @@ const AddonPathHelpModal: React.FC<AddonPathHelpModalProps> = ({ isOpen, onClose
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          backgroundColor: '#ffffff',
+          backgroundColor: 'var(--modal-bg)',
           borderRadius: '14px',
           width: '92%',
           maxWidth: '480px',
           boxShadow: '0 20px 40px -10px rgba(0,0,0,0.2)',
-          border: '1px solid #e5e7eb',
+          border: '1px solid var(--modal-border)',
           overflow: 'hidden',
         }}
       >
@@ -75,7 +75,7 @@ const AddonPathHelpModal: React.FC<AddonPathHelpModalProps> = ({ isOpen, onClose
 
         {/* Path breakdown */}
         <div style={{ padding: '18px 20px' }}>
-          <p style={{ margin: '0 0 14px', fontSize: '0.85rem', color: '#6b7280' }}>
+          <p style={{ margin: '0 0 14px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
             Simply select the <strong>folder where your wow.exe is located</strong>. The Uploader will automatically find all your accounts and sync to them.
           </p>
 
@@ -96,18 +96,18 @@ const AddonPathHelpModal: React.FC<AddonPathHelpModalProps> = ({ isOpen, onClose
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  backgroundColor: i === pathSegments.length - 1 ? '#f0fdf4' : '#f9fafb',
-                  border: `1px solid ${i === pathSegments.length - 1 ? '#bbf7d0' : '#e5e7eb'}`,
+                  backgroundColor: i === pathSegments.length - 1 ? 'var(--bg-panel-success)' : 'var(--bg-root)',
+                  border: `1px solid ${i === pathSegments.length - 1 ? 'var(--border-success-soft)' : 'var(--border-soft)'}`,
                   borderRadius: '8px',
                   padding: '8px 12px',
                 }}>
-                  <span style={{ fontSize: '0.82rem', color: '#374151', fontWeight: 500 }}>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-primary)', fontWeight: 500 }}>
                     {seg.label}
                   </span>
                   <code style={{
                     fontSize: '0.78rem',
                     color: seg.color,
-                    backgroundColor: 'rgba(0,0,0,0.04)',
+                    backgroundColor: 'var(--modal-footer-bg)',
                     padding: '2px 7px',
                     borderRadius: '4px',
                     fontFamily: 'monospace',
@@ -122,34 +122,34 @@ const AddonPathHelpModal: React.FC<AddonPathHelpModalProps> = ({ isOpen, onClose
           {/* Full path example */}
           <div style={{
             marginTop: '16px',
-            backgroundColor: '#f8fafc',
-            border: '1px solid #e2e8f0',
+            backgroundColor: 'var(--bg-root)',
+            border: '1px solid var(--border-soft)',
             borderRadius: '8px',
             padding: '10px 12px',
           }}>
-            <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginBottom: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Directory Example
             </div>
-            <code style={{ fontSize: '0.75rem', color: '#475569', wordBreak: 'break-all', lineHeight: 1.6 }}>
+            <code style={{ fontSize: '0.75rem', color: 'var(--text-primary)', wordBreak: 'break-all', lineHeight: 1.6 }}>
               E:\World of Warcraft 3.3.5a
             </code>
           </div>
 
           <div style={{
             marginTop: '14px',
-            backgroundColor: '#eff6ff',
-            border: '1px solid #bfdbfe',
+            backgroundColor: 'var(--bg-panel-info)',
+            border: '1px solid var(--bg-panel-border)',
             borderRadius: '8px',
             padding: '9px 12px',
             fontSize: '0.8rem',
-            color: '#1e40af',
+            color: 'var(--text-info)',
           }}>
             💡 <strong>Auto-Syncing:</strong> Once linked, when you click "Update Rankings", the app will inject the data into <strong>every account</strong> folder inside your WTF folder automatically!
           </div>
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '12px 20px', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--modal-border)', display: 'flex', justifyContent: 'flex-end', backgroundColor: 'var(--modal-footer-bg)' }}>
           <button
             onClick={onClose}
             style={{

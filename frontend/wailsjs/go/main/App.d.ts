@@ -8,6 +8,8 @@ export function GetPremiumConfig():Promise<Record<string, string>>;
 
 export function GetSavedDirectory():Promise<string>;
 
+export function GetTheme():Promise<string>;
+
 export function GetUploaderServers():Promise<Array<main.UploaderServer>>;
 
 export function GetWowDirectory():Promise<string>;
@@ -23,6 +25,8 @@ export function SavePremiumConfig(arg1:string,arg2:string,arg3:string):Promise<v
 export function SelectDirectory():Promise<string>;
 
 export function SelectWowDirectory():Promise<string>;
+
+export function SetTheme(arg1:string):Promise<void>;
 
 export function StartMonitoringJob(arg1:number):Promise<void>;
 

@@ -30,7 +30,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+      backgroundColor: 'var(--modal-overlay)',
       backdropFilter: 'blur(2px)',
       display: 'flex',
       alignItems: 'center',
@@ -38,20 +38,20 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       zIndex: 1000,
     }}>
       <div style={{
-        backgroundColor: '#ffffff',
+        backgroundColor: 'var(--modal-bg)',
         padding: '24px',
         borderRadius: '12px',
         width: '90%',
         maxWidth: '400px',
         boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-        border: '1px solid #e5e7eb',
+        border: '1px solid var(--modal-border)',
       }}>
         <h3 style={{
           marginTop: 0,
           marginBottom: '12px',
           fontSize: '1.25rem',
           fontWeight: 600,
-          color: '#111827',
+          color: 'var(--text-primary)',
         }}>
           {title}
         </h3>
@@ -59,7 +59,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           marginBottom: '24px',
           fontSize: '0.95rem',
           lineHeight: '1.5',
-          color: '#4b5563',
+          color: 'var(--text-muted)',
         }}>
           {message}
         </p>
@@ -73,9 +73,9 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             style={{
               padding: '8px 16px',
               borderRadius: '6px',
-              border: '1px solid #d1d5db',
-              backgroundColor: '#ffffff',
-              color: '#374151',
+              border: '1px solid var(--border-soft)',
+              backgroundColor: 'transparent',
+              color: 'var(--text-primary)',
               fontSize: '0.9rem',
               fontWeight: 500,
               cursor: 'pointer',

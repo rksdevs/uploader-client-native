@@ -27,6 +27,7 @@ type Config struct {
 	ApiToken                string `json:"apiToken,omitempty"`
 	ApiTokenType            string `json:"apiTokenType,omitempty"` // "personal" or "guild"
 	FollowedPlayers         string `json:"followedPlayers,omitempty"` // comma-separated player names
+	Theme                   string `json:"theme,omitempty"`           // "light" or "dark"
 }
 
 type App struct {
@@ -123,6 +124,18 @@ func (a *App) GetSavedDirectory() string {
 
 func (a *App) GetWowDirectory() string {
 	return a.config.WowDirectory
+}
+
+func (a *App) GetTheme() string {
+	if a.config.Theme == "" {
+		return "light"
+	}
+	return a.config.Theme
+}
+
+func (a *App) SetTheme(theme string) error {
+	a.config.Theme = theme
+	return a.saveConfig()
 }
 
 func (a *App) SelectDirectory() (string, error) {

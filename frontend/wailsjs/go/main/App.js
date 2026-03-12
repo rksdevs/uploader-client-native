@@ -14,6 +14,10 @@ export function GetSavedDirectory() {
   return window['go']['main']['App']['GetSavedDirectory']();
 }
 
+export function GetTheme() {
+  return window['go']['main']['App']['GetTheme']();
+}
+
 export function GetUploaderServers() {
   return window['go']['main']['App']['GetUploaderServers']();
 }
@@ -44,6 +48,10 @@ export function SelectDirectory() {
 
 export function SelectWowDirectory() {
   return window['go']['main']['App']['SelectWowDirectory']();
+}
+
+export function SetTheme(arg1) {
+  return window['go']['main']['App']['SetTheme'](arg1);
 }
 
 export function StartMonitoringJob(arg1) {

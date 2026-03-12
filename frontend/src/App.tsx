@@ -14,6 +14,8 @@ import {
   UpdateAddonRankings,
   GetPremiumConfig,
   SavePremiumConfig,
+  GetTheme,
+  SetTheme,
 } from "../wailsjs/go/main/App";
 import { main } from "../wailsjs/go/models";
 import {
@@ -53,6 +55,7 @@ function App() {
   const [isSavingPremium, setIsSavingPremium] = useState<boolean>(false);
   const [showClearConfirm, setShowClearConfirm] = useState<boolean>(false);
   const [showAddonHelp, setShowAddonHelp] = useState<boolean>(false);
+  const [theme, setTheme] = useState<string>("light");
 
   useEffect(() => {
     GetSavedDirectory()
@@ -101,6 +104,14 @@ function App() {
       })
       .catch((err: unknown) => {
         console.error("[React App] Error loading premium config:", err);
+      });
+
+    GetTheme()
+      .then((savedTheme: string) => {
+        if (savedTheme) setTheme(savedTheme);
+      })
+      .catch((err: unknown) => {
+        console.error("[React App] Error loading theme:", err);
       });
   }, []);
 
@@ -218,6 +229,14 @@ function App() {
       .finally(() => setIsSavingPremium(false));
   };
 
+  const toggleTheme = () => {
+    const newTheme = theme === "light" ? "dark" : "light";
+    setTheme(newTheme);
+    SetTheme(newTheme).catch((err: any) => {
+      console.error("[React App] Failed to save theme:", err);
+    });
+  };
+
   const handlePreprocess = () => {
     if (!logDirectory || !selectedServer) {
       toast.error("Please select a log directory and a server first.");
@@ -294,9 +313,19 @@ function App() {
   };
 
   return (
-    <div id="App">
+    <div id="App" className={theme === "dark" ? "dark-theme" : ""}>
       <div className="container">
-        <h1>WoW Logs Uploader</h1>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem" }}>
+          <div style={{ width: "32px" }}></div>
+          <h1 style={{ margin: 0 }}>WoW Logs Uploader</h1>
+          <button 
+            onClick={toggleTheme}
+            className="theme-toggle"
+            title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+          >
+            {theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}
+          </button>
+        </div>
         {view === "upload" ? (
           <>
             <StatusDisplay message={statusMessage} />
@@ -483,8 +512,8 @@ function App() {
           <a
             href="#"
             style={{ 
-              color: "#312e81", 
-              fontSize: "12px", 
+              color: "var(--text-link)", 
+              fontSize: "13px", 
               fontWeight: "600",
               textDecoration: "underline",
               letterSpacing: "0.3px"
