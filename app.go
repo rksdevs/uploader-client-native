@@ -176,6 +176,20 @@ func (a *App) PreprocessLog(logDirectory string, serverName string) (*Preprocess
 	log.Printf("[Go Backend] PREPROCESS: Starting for directory '%s', Server: '%s'\n", logDirectory, serverName)
 	logPath := filepath.Join(logDirectory, "WoWCombatLog.txt")
 
+	const maxLogSizeBytes = 500 * 1024 * 1024 // 500 MB
+	fileInfo, err := os.Stat(logPath)
+	if err != nil {
+		return nil, fmt.Errorf("could not access WoWCombatLog.txt: %w", err)
+	}
+	if fileInfo.Size() > maxLogSizeBytes {
+		sizeMB := fileInfo.Size() / 1024 / 1024
+		return nil, fmt.Errorf(
+			"WoWCombatLog.txt is too large to upload (%d MB). Maximum allowed size is 500 MB. "+
+				"Please clear your log file in-game (type /combatlog in chat to toggle it off and on) before uploading.",
+			sizeMB,
+		)
+	}
+
 	logData, err := os.ReadFile(logPath)
 	if err != nil {
 		return nil, fmt.Errorf("could not read WoWCombatLog.txt: %w", err)
