@@ -1,13 +1,30 @@
-import { main } from "../wailsjs/go/models";
+export interface InstancePreview {
+  loggedBy: string;
+  bosses: string[];
+  formattedStartTime: string;
+  formattedEndTime: string;
+  detectedServerName?: string;
+  detectedGuidPrefix?: string;
+}
 
-export type Instance = main.Instance;
-export type InstancePreview = main.InstancePreview;
+export interface Instance {
+  name: string;
+  encounterStartTime: string;
+  startMs: number;
+  endMs: number;
+  lineStart: number;
+  lineEnd: number;
+  serverName?: string;
+  serverVerified?: boolean;
+  preview?: InstancePreview;
+}
 
 export interface PreprocessResponse {
   message: string;
   preprocessId: number;
   instances: Instance[];
   autoQueued: boolean;
+  hasMultipleDetectedServers: boolean;
   viewLogURL: string;
 }
 export interface JobStatusResponse {

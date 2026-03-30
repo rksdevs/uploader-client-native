@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -41,19 +42,74 @@ type App struct {
 }
 
 func fallbackUploaderServers() []UploaderServer {
-	return []UploaderServer{
+	servers := []UploaderServer{
 		{ID: 0, Value: "Whitemane_Frostmourne", Label: "Whitemane-Frostmourne"},
-		{ID: 0, Value: "Warmane_Icecrown", Label: "Warmane-Icecrown"},
-		{ID: 0, Value: "Warmane_Onyxia", Label: "Warmane-Onyxia"},
+		{ID: 0, Value: "Warmane_Icecrown", Label: "Warmane - Icecrown"},
+		{ID: 0, Value: "Warmane_Onyxia", Label: "Warmane - Onyxia"},
 		{ID: 0, Value: "Sunwell", Label: "Sunwell"},
-		{ID: 0, Value: "AstraWow_Wrathion", Label: "AstraWow-Wrathion"},
-		{ID: 0, Value: "AstraWow_Neltharion", Label: "AstraWow-Neltharion"},
-		{ID: 0, Value: "Warmane_Lordaeron", Label: "Warmane-Lordaeron"},
-		{ID: 0, Value: "Stormforge_Frostmourne_S1", Label: "Stormforge-Frostmourne-S1"},
-		{ID: 0, Value: "Freedom_Wow", Label: "Freedom-Wow"},
-		{ID: 0, Value: "Rising_Gods", Label: "Rising-Gods"},
+		{ID: 0, Value: "AstraWow_Wrathion", Label: "Dev-Server-Testing"},
+		{ID: 0, Value: "AstraWow_Neltharion", Label: "WOTLK-PTR-Server"},
+		{ID: 0, Value: "Warmane_Lordaeron", Label: "Warmane - Lordaeron"},
+		{ID: 0, Value: "Stormforge_Frostmourne_S1", Label: "Stormforge - FrostmourneS1"},
+		{ID: 0, Value: "Freedom_Wow", Label: "Freedom - WoW"},
+		{ID: 0, Value: "Rising_Gods", Label: "Rising - Gods"},
 		{ID: 0, Value: "Chromiecraft", Label: "Chromiecraft"},
 	}
+	return normalizeServerLabels(servers)
+}
+
+func normalizeServerLabels(servers []UploaderServer) []UploaderServer {
+	order := map[string]int{
+		"Warmane_Lordaeron":         0,
+		"Warmane_Icecrown":          1,
+		"Warmane_Onyxia":            2,
+		"Stormforge_Frostmourne_S1": 3,
+		"Freedom_Wow":               4,
+		"Rising_Gods":               5,
+		"Chromiecraft":              6,
+		"AstraWow_Wrathion":         7,
+		"AstraWow_Neltharion":       8,
+		"Whitemane_Frostmourne":     9,
+		"Sunwell":                   10,
+	}
+
+	for i := range servers {
+		switch servers[i].Value {
+		case "Warmane_Lordaeron":
+			servers[i].Label = "Warmane - Lordaeron"
+		case "Warmane_Icecrown":
+			servers[i].Label = "Warmane - Icecrown"
+		case "Warmane_Onyxia":
+			servers[i].Label = "Warmane - Onyxia"
+		case "Stormforge_Frostmourne_S1":
+			servers[i].Label = "Stormforge - FrostmourneS1"
+		case "Freedom_Wow":
+			servers[i].Label = "Freedom - WoW"
+		case "Rising_Gods":
+			servers[i].Label = "Rising - Gods"
+		case "AstraWow_Wrathion":
+			servers[i].Label = "Dev-Server-Testing"
+		case "AstraWow_Neltharion":
+			servers[i].Label = "WOTLK-PTR-Server"
+		}
+	}
+
+	sort.SliceStable(servers, func(i, j int) bool {
+		ri, iok := order[servers[i].Value]
+		rj, jok := order[servers[j].Value]
+		switch {
+		case iok && jok:
+			return ri < rj
+		case iok:
+			return true
+		case jok:
+			return false
+		default:
+			return strings.ToLower(servers[i].Label) < strings.ToLower(servers[j].Label)
+		}
+	})
+
+	return servers
 }
 
 func NewApp() *App {
@@ -176,7 +232,9 @@ func (a *App) PreprocessLog(logDirectory string, serverName string) (*Preprocess
 	log.Printf("[Go Backend] PREPROCESS: Starting for directory '%s', Server: '%s'\n", logDirectory, serverName)
 	logPath := filepath.Join(logDirectory, "WoWCombatLog.txt")
 
-	const maxLogSizeBytes = 500 * 1024 * 1024 // 500 MB
+	// TEMPORARY (local slicing test): raised from 500 MB to 3 GB.
+	// Revert to 500 MB after testing.
+	const maxLogSizeBytes = 3 * 1024 * 1024 * 1024 // 3 GB
 	fileInfo, err := os.Stat(logPath)
 	if err != nil {
 		return nil, fmt.Errorf("could not access WoWCombatLog.txt: %w", err)
@@ -184,7 +242,7 @@ func (a *App) PreprocessLog(logDirectory string, serverName string) (*Preprocess
 	if fileInfo.Size() > maxLogSizeBytes {
 		sizeMB := fileInfo.Size() / 1024 / 1024
 		return nil, fmt.Errorf(
-			"WoWCombatLog.txt is too large to upload (%d MB). Maximum allowed size is 500 MB. "+
+			"WoWCombatLog.txt is too large to upload (%d MB). Maximum allowed size is 3072 MB. "+
 				"Please clear your log file in-game (type /combatlog in chat to toggle it off and on) before uploading.",
 			sizeMB,
 		)
@@ -229,7 +287,9 @@ func (a *App) PreprocessLog(logDirectory string, serverName string) (*Preprocess
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("X-Socket-ID", "wails-native-client-polling") // Use a static ID for polling
 
-	client := &http.Client{Timeout: 60 * time.Second}
+	// TEMPORARY (local large-log slicing test): raised preprocess HTTP timeout.
+	// Revert to 60s after testing.
+	client := &http.Client{Timeout: 10 * time.Minute}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send preprocess request: %w", err)
@@ -396,7 +456,7 @@ func (a *App) GetUploaderServers() []UploaderServer {
 		return fallbackUploaderServers()
 	}
 
-	return payload.Servers
+	return normalizeServerLabels(payload.Servers)
 }
 
 func (a *App) OpenLogPage(logId int) {

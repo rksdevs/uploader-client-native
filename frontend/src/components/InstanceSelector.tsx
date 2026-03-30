@@ -1,11 +1,15 @@
 import React, { useState } from "react";
 import { Instance } from "../types";
+import { ServerOption } from "./ServerSelector";
 
 interface InstanceSelectorProps {
   instances: Instance[];
   onProcess: (selectedInstances: Instance[]) => void;
   onCancel: () => void;
   isProcessing: boolean;
+  selectedServer: string;
+  serverOptions: ServerOption[];
+  hasMultipleDetectedServers: boolean;
 }
 
 function InstanceSelector({
@@ -13,10 +17,34 @@ function InstanceSelector({
   onProcess,
   onCancel,
   isProcessing,
+  selectedServer,
+  serverOptions,
+  hasMultipleDetectedServers,
 }: InstanceSelectorProps) {
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
     new Set()
   );
+  const [instanceServerSelection, setInstanceServerSelection] = useState<
+    Record<number, string>
+  >(() => {
+    const initial: Record<number, string> = {};
+    instances.forEach((instance, index) => {
+      initial[index] =
+        instance.serverName ||
+        instance.preview?.detectedServerName ||
+        selectedServer;
+    });
+    return initial;
+  });
+  const [instanceServerVerified, setInstanceServerVerified] = useState<
+    Record<number, boolean>
+  >(() => {
+    const initial: Record<number, boolean> = {};
+    instances.forEach((_, index) => {
+      initial[index] = false;
+    });
+    return initial;
+  });
 
   const formatDate = (dateStr: string): string => {
     if (!dateStr) return "Unknown";
@@ -47,16 +75,44 @@ function InstanceSelector({
   };
 
   const handleProcessClick = () => {
-    const selected = instances.filter((_, index) => selectedIndices.has(index));
+    const selected = instances
+      .map((instance, index) => ({ instance, index }))
+      .filter(({ index }) => selectedIndices.has(index))
+      .map(({ instance, index }) => ({
+        ...instance,
+        serverName: instanceServerSelection[index] || selectedServer,
+        serverVerified: !!instanceServerVerified[index],
+      }));
     if (selected.length > 0) {
       onProcess(selected);
     }
+  };
+
+  const handleInstanceServerChange = (index: number, value: string) => {
+    setInstanceServerSelection((prev) => ({ ...prev, [index]: value }));
+    setInstanceServerVerified((prev) => ({ ...prev, [index]: false }));
+  };
+
+  const handleInstanceVerificationChange = (index: number, checked: boolean) => {
+    setInstanceServerVerified((prev) => ({ ...prev, [index]: checked }));
   };
 
   const allSelected =
     selectedIndices.size === instances.length && instances.length > 0;
   const someSelected =
     selectedIndices.size > 0 && selectedIndices.size < instances.length;
+  const hasUnverifiedSelected =
+    hasMultipleDetectedServers &&
+    Array.from(selectedIndices).some((idx) => !instanceServerVerified[idx]);
+  const canProcess =
+    !isProcessing && selectedIndices.size > 0 && !hasUnverifiedSelected;
+
+  /** Map backend/internal server value to client-facing label (matches dropdown). */
+  const serverLabel = (internalValue: string): string => {
+    if (!internalValue) return "Unknown";
+    const opt = serverOptions.find((o) => o.value === internalValue);
+    return opt?.label ?? internalValue;
+  };
 
   return (
     <div className="instance-selector">
@@ -130,6 +186,75 @@ function InstanceSelector({
                       {instance.preview?.loggedBy || "Unknown"}
                     </span>
                   </div>
+                  {hasMultipleDetectedServers ? (
+                    <>
+                      <div className="info-row">
+                        <span className="info-label">Detected:</span>
+                        <span className="info-value">
+                          {serverLabel(
+                            instance.preview?.detectedServerName || ""
+                          )}
+                          {instance.preview?.detectedGuidPrefix
+                            ? ` (GUID ${instance.preview.detectedGuidPrefix})`
+                            : ""}
+                        </span>
+                      </div>
+                      <div className="instance-row-block">
+                        <label
+                          className="info-label"
+                          htmlFor={`slice-server-${index}`}
+                        >
+                          Slice server:
+                        </label>
+                        <select
+                          id={`slice-server-${index}`}
+                          className="slice-server-select"
+                          value={instanceServerSelection[index] || selectedServer}
+                          onChange={(e) =>
+                            handleInstanceServerChange(index, e.target.value)
+                          }
+                          disabled={isProcessing}
+                        >
+                          <option value="">Select server...</option>
+                          {serverOptions.map((opt) => (
+                            <option
+                              key={`slice-${index}-${opt.value}-${opt.id ?? "na"}`}
+                              value={opt.value}
+                            >
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="verify-row">
+                        <input
+                          type="checkbox"
+                          id={`verify-slice-${index}`}
+                          checked={!!instanceServerVerified[index]}
+                          onChange={(e) =>
+                            handleInstanceVerificationChange(
+                              index,
+                              e.target.checked
+                            )
+                          }
+                          disabled={isProcessing}
+                        />
+                        <label htmlFor={`verify-slice-${index}`}>
+                          I confirm this slice server is correct.
+                        </label>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="info-row">
+                      <span className="info-label">Detected server:</span>
+                      <span className="info-value">
+                        {serverLabel(
+                          instance.preview?.detectedServerName ||
+                            selectedServer
+                        )}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -141,7 +266,12 @@ function InstanceSelector({
         <button
           className="btn"
           onClick={handleProcessClick}
-          disabled={isProcessing || selectedIndices.size === 0}
+          disabled={!canProcess}
+          title={
+            hasUnverifiedSelected
+              ? "Verify server selection for each selected slice."
+              : ""
+          }
         >
           {isProcessing
             ? "Queuing Jobs..."

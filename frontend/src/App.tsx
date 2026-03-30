@@ -46,6 +46,8 @@ function App() {
   const [view, setView] = useState<"upload" | "select">("upload");
   const [preprocessId, setPreprocessId] = useState<number | null>(null);
   const [instances, setInstances] = useState<Instance[]>([]);
+  const [hasMultipleDetectedServers, setHasMultipleDetectedServers] =
+    useState<boolean>(false);
   const [serverOptions, setServerOptions] = useState<ServerOption[]>([]);
   const [wowDirectory, setWowDirectory] = useState<string>("");
   const [showPremiumSettings, setShowPremiumSettings] = useState<boolean>(false);
@@ -254,6 +256,7 @@ function App() {
         } else {
           setInstances(response.instances);
           setPreprocessId(response.preprocessId);
+          setHasMultipleDetectedServers(!!response.hasMultipleDetectedServers);
           setView("select");
         }
       })
@@ -305,6 +308,7 @@ function App() {
     setView("upload");
     setInstances([]);
     setPreprocessId(null);
+    setHasMultipleDetectedServers(false);
     if (logDirectory) {
       setStatusMessage(`Monitoring logs in: ${logDirectory}`);
     } else {
@@ -496,6 +500,9 @@ function App() {
             onProcess={handleEnqueue}
             onCancel={resetToUploadView}
             isProcessing={isProcessing}
+            selectedServer={selectedServer}
+            serverOptions={serverOptions}
+            hasMultipleDetectedServers={hasMultipleDetectedServers}
           />
         )}
 

@@ -5,6 +5,8 @@ export namespace main {
 	    bosses: string[];
 	    formattedStartTime: string;
 	    formattedEndTime: string;
+	    detectedServerName?: string;
+	    detectedGuidPrefix?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new InstancePreview(source);
@@ -16,6 +18,8 @@ export namespace main {
 	        this.bosses = source["bosses"];
 	        this.formattedStartTime = source["formattedStartTime"];
 	        this.formattedEndTime = source["formattedEndTime"];
+	        this.detectedServerName = source["detectedServerName"];
+	        this.detectedGuidPrefix = source["detectedGuidPrefix"];
 	    }
 	}
 	export class Instance {
@@ -25,6 +29,8 @@ export namespace main {
 	    endMs: number;
 	    lineStart: number;
 	    lineEnd: number;
+	    serverName?: string;
+	    serverVerified?: boolean;
 	    preview?: InstancePreview;
 	
 	    static createFrom(source: any = {}) {
@@ -39,6 +45,8 @@ export namespace main {
 	        this.endMs = source["endMs"];
 	        this.lineStart = source["lineStart"];
 	        this.lineEnd = source["lineEnd"];
+	        this.serverName = source["serverName"];
+	        this.serverVerified = source["serverVerified"];
 	        this.preview = this.convertValues(source["preview"], InstancePreview);
 	    }
 	
@@ -66,6 +74,7 @@ export namespace main {
 	    preprocessId: number;
 	    instances: Instance[];
 	    autoQueued: boolean;
+	    hasMultipleDetectedServers: boolean;
 	    viewLogURL: string;
 	
 	    static createFrom(source: any = {}) {
@@ -78,6 +87,7 @@ export namespace main {
 	        this.preprocessId = source["preprocessId"];
 	        this.instances = this.convertValues(source["instances"], Instance);
 	        this.autoQueued = source["autoQueued"];
+	        this.hasMultipleDetectedServers = source["hasMultipleDetectedServers"];
 	        this.viewLogURL = source["viewLogURL"];
 	    }
 	

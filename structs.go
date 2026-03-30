@@ -1,11 +1,12 @@
 package main
 
 type PreprocessResponse struct {
-	Message      string     `json:"message"`
-	PreprocessID int        `json:"preprocessId"`
-	Instances    []Instance `json:"instances"`
-	AutoQueued   bool       `json:"autoQueued"`
-	ViewLogURL   string     `json:"viewLogURL"`
+	Message                    string     `json:"message"`
+	PreprocessID               int        `json:"preprocessId"`
+	Instances                  []Instance `json:"instances"`
+	AutoQueued                 bool       `json:"autoQueued"`
+	HasMultipleDetectedServers bool       `json:"hasMultipleDetectedServers"`
+	ViewLogURL                 string     `json:"viewLogURL"`
 }
 
 type Instance struct {
@@ -15,6 +16,8 @@ type Instance struct {
 	EndMs              int64            `json:"endMs"`
 	LineStart          int              `json:"lineStart"`
 	LineEnd            int              `json:"lineEnd"`
+	ServerName         string           `json:"serverName,omitempty"`
+	ServerVerified     bool             `json:"serverVerified,omitempty"`
 	Preview            *InstancePreview `json:"preview"`
 }
 
@@ -23,6 +26,8 @@ type InstancePreview struct {
 	Bosses             []string `json:"bosses"`
 	FormattedStartTime string   `json:"formattedStartTime"`
 	FormattedEndTime   string   `json:"formattedEndTime"`
+	DetectedServerName string   `json:"detectedServerName,omitempty"`
+	DetectedGuidPrefix string   `json:"detectedGuidPrefix,omitempty"`
 }
 
 type JobStatusResponse struct {

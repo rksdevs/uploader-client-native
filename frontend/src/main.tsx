@@ -9,7 +9,7 @@ const root = createRoot(container!);
 
 root.render(
   <React.StrictMode>
-    <Toaster richColors />
+    <Toaster richColors closeButton />
     <App />
   </React.StrictMode>
 );
