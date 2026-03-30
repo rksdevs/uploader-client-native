@@ -232,9 +232,8 @@ func (a *App) PreprocessLog(logDirectory string, serverName string) (*Preprocess
 	log.Printf("[Go Backend] PREPROCESS: Starting for directory '%s', Server: '%s'\n", logDirectory, serverName)
 	logPath := filepath.Join(logDirectory, "WoWCombatLog.txt")
 
-	// TEMPORARY (local slicing test): raised from 500 MB to 3 GB.
-	// Revert to 500 MB after testing.
-	const maxLogSizeBytes = 3 * 1024 * 1024 * 1024 // 3 GB
+	// Local uploader limit.
+	const maxLogSizeBytes = 1 * 1024 * 1024 * 1024 // 1 GB
 	fileInfo, err := os.Stat(logPath)
 	if err != nil {
 		return nil, fmt.Errorf("could not access WoWCombatLog.txt: %w", err)
@@ -242,7 +241,7 @@ func (a *App) PreprocessLog(logDirectory string, serverName string) (*Preprocess
 	if fileInfo.Size() > maxLogSizeBytes {
 		sizeMB := fileInfo.Size() / 1024 / 1024
 		return nil, fmt.Errorf(
-			"WoWCombatLog.txt is too large to upload (%d MB). Maximum allowed size is 3072 MB. "+
+			"WoWCombatLog.txt is too large to upload (%d MB). Maximum allowed size is 1024 MB. "+
 				"Please clear your log file in-game (type /combatlog in chat to toggle it off and on) before uploading.",
 			sizeMB,
 		)
@@ -287,9 +286,7 @@ func (a *App) PreprocessLog(logDirectory string, serverName string) (*Preprocess
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("X-Socket-ID", "wails-native-client-polling") // Use a static ID for polling
 
-	// TEMPORARY (local large-log slicing test): raised preprocess HTTP timeout.
-	// Revert to 60s after testing.
-	client := &http.Client{Timeout: 10 * time.Minute}
+	client := &http.Client{Timeout: 3 * time.Minute}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send preprocess request: %w", err)
