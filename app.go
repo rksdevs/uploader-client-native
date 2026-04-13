@@ -54,6 +54,7 @@ func fallbackUploaderServers() []UploaderServer {
 		{ID: 0, Value: "Freedom_Wow", Label: "Freedom - WoW"},
 		{ID: 0, Value: "Rising_Gods", Label: "Rising - Gods"},
 		{ID: 0, Value: "Chromiecraft", Label: "Chromiecraft"},
+		{ID: 0, Value: "Wow_Patagonia", Label: "Wow - Patagonia"},
 	}
 	return normalizeServerLabels(servers)
 }
@@ -67,10 +68,11 @@ func normalizeServerLabels(servers []UploaderServer) []UploaderServer {
 		"Freedom_Wow":               4,
 		"Rising_Gods":               5,
 		"Chromiecraft":              6,
-		"AstraWow_Wrathion":         7,
-		"AstraWow_Neltharion":       8,
-		"Whitemane_Frostmourne":     9,
-		"Sunwell":                   10,
+		"Wow_Patagonia":             7,
+		"AstraWow_Wrathion":         8,
+		"AstraWow_Neltharion":       9,
+		"Whitemane_Frostmourne":     10,
+		"Sunwell":                   11,
 	}
 
 	for i := range servers {
@@ -87,6 +89,8 @@ func normalizeServerLabels(servers []UploaderServer) []UploaderServer {
 			servers[i].Label = "Freedom - WoW"
 		case "Rising_Gods":
 			servers[i].Label = "Rising - Gods"
+		case "Wow_Patagonia":
+			servers[i].Label = "Wow - Patagonia"
 		case "AstraWow_Wrathion":
 			servers[i].Label = "Dev-Server-Testing"
 		case "AstraWow_Neltharion":
