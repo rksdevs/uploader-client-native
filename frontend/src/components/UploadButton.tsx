@@ -1,4 +1,5 @@
 import React from "react";
+import { Upload } from "lucide-react";
 
 interface UploadButtonProps {
   onUpload: () => void;
@@ -13,11 +14,13 @@ const UploadButton: React.FC<UploadButtonProps> = ({
 }) => {
   return (
     <button
+      type="button"
       onClick={onUpload}
       disabled={disabled}
-      className={`upload-button ${isProcessing ? "processing" : ""}`}
+      className={`btn-gradient-primary btn-with-icon upload-cta ${isProcessing ? "processing" : ""}`}
     >
-      {isProcessing ? "Processing..." : "Upload & Process Log"}
+      <Upload size={18} strokeWidth={2} aria-hidden />
+      {isProcessing ? "Processing…" : "Upload & Process Log"}
     </button>
   );
 };

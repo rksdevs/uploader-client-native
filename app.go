@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -42,8 +43,10 @@ type App struct {
 }
 
 func fallbackUploaderServers() []UploaderServer {
+	// Offline / API-failure list — keep aligned with log-parser `ADDON_REALM_LABELS` and common Server.name values.
 	servers := []UploaderServer{
 		{ID: 0, Value: "Whitemane_Frostmourne", Label: "Whitemane-Frostmourne"},
+		{ID: 0, Value: "Whitemane_Gilneas", Label: "Whitemane-Gilneas"},
 		{ID: 0, Value: "Warmane_Icecrown", Label: "Warmane - Icecrown"},
 		{ID: 0, Value: "Warmane_Onyxia", Label: "Warmane - Onyxia"},
 		{ID: 0, Value: "Sunwell", Label: "Sunwell"},
@@ -55,8 +58,37 @@ func fallbackUploaderServers() []UploaderServer {
 		{ID: 0, Value: "Rising_Gods", Label: "Rising - Gods"},
 		{ID: 0, Value: "Chromiecraft", Label: "Chromiecraft"},
 		{ID: 0, Value: "Wow_Patagonia", Label: "Wow - Patagonia"},
+		{ID: 0, Value: "CircleWow_x1", Label: "Circle WoW (x1)"},
+		{ID: 0, Value: "CircleWow_x4", Label: "Circle WoW (x4)"},
+		{ID: 0, Value: "CircleWow_x100", Label: "Circle WoW (x100)"},
 	}
 	return normalizeServerLabels(servers)
+}
+
+// mergeUploaderServers keeps the API list (correct DB ids) and adds any fallback
+// entries whose Value is missing. Production /api/v5/uploader/servers only returns
+// rows present in Server; until migration+seed run, new realms would otherwise
+// never appear despite being in fallbackUploaderServers().
+func mergeUploaderServers(api []UploaderServer, fallback []UploaderServer) []UploaderServer {
+	seen := make(map[string]struct{}, len(api)+len(fallback))
+	for _, s := range api {
+		if s.Value != "" {
+			seen[s.Value] = struct{}{}
+		}
+	}
+	out := make([]UploaderServer, len(api), len(api)+len(fallback))
+	copy(out, api)
+	for _, s := range fallback {
+		if s.Value == "" {
+			continue
+		}
+		if _, ok := seen[s.Value]; ok {
+			continue
+		}
+		seen[s.Value] = struct{}{}
+		out = append(out, s)
+	}
+	return out
 }
 
 func normalizeServerLabels(servers []UploaderServer) []UploaderServer {
@@ -72,7 +104,11 @@ func normalizeServerLabels(servers []UploaderServer) []UploaderServer {
 		"AstraWow_Wrathion":         8,
 		"AstraWow_Neltharion":       9,
 		"Whitemane_Frostmourne":     10,
-		"Sunwell":                   11,
+		"Whitemane_Gilneas":         11,
+		"Sunwell":                   12,
+		"CircleWow_x1":              13,
+		"CircleWow_x4":              14,
+		"CircleWow_x100":            15,
 	}
 
 	for i := range servers {
@@ -91,6 +127,14 @@ func normalizeServerLabels(servers []UploaderServer) []UploaderServer {
 			servers[i].Label = "Rising - Gods"
 		case "Wow_Patagonia":
 			servers[i].Label = "Wow - Patagonia"
+		case "CircleWow_x1":
+			servers[i].Label = "Circle WoW (x1)"
+		case "CircleWow_x4":
+			servers[i].Label = "Circle WoW (x4)"
+		case "CircleWow_x100":
+			servers[i].Label = "Circle WoW (x100)"
+		case "Whitemane_Gilneas":
+			servers[i].Label = "Whitemane-Gilneas"
 		case "AstraWow_Wrathion":
 			servers[i].Label = "Dev-Server-Testing"
 		case "AstraWow_Neltharion":
@@ -457,7 +501,8 @@ func (a *App) GetUploaderServers() []UploaderServer {
 		return fallbackUploaderServers()
 	}
 
-	return normalizeServerLabels(payload.Servers)
+	merged := mergeUploaderServers(payload.Servers, fallbackUploaderServers())
+	return normalizeServerLabels(merged)
 }
 
 func (a *App) OpenLogPage(logId int) {
@@ -522,6 +567,10 @@ type addonRankingRow struct {
 	IsFollowed    bool     `json:"isFollowed"`
 	Trend         *float64 `json:"trend"`
 	LatestDate    string   `json:"latestDate"`
+	// Boss points leaderboard V2 (when payload.PointsV2); serialized as compact CSV in rows.
+	SpecPercentileV2  float64 `json:"specPercentileV2,omitempty"`
+	ClassPercentileV2 float64 `json:"classPercentileV2,omitempty"`
+	RolePercentileV2  float64 `json:"rolePercentileV2,omitempty"`
 }
 
 type addonRankingsResponse struct {
@@ -531,6 +580,8 @@ type addonRankingsResponse struct {
 	Season             int               `json:"season"`
 	GeneratedAt        string            `json:"generatedAt"`
 	IsPremium          bool              `json:"isPremium"`
+	PointsV2           bool              `json:"pointsV2"`
+	PointsSliceSummary string            `json:"pointsSliceSummary"`
 	Count              int               `json:"count"`
 	PointsCount        int               `json:"pointsCount"`
 	PerformanceCount   int               `json:"performanceCount"`
@@ -538,6 +589,68 @@ type addonRankingsResponse struct {
 	Rows               []addonRankingRow `json:"rows"`
 	PerformanceFilters addonFilters      `json:"performanceFilters"`
 	PerformanceRows    []addonRankingRow `json:"performanceRows"`
+	ExportMeta         *addonExportMeta  `json:"exportMeta"`
+}
+
+// addonExportMeta holds optional API fields we persist into SavedVariables for the in-game UI.
+type addonExportMeta struct {
+	PerformanceSliceSummary string `json:"performanceSliceSummary"`
+	PointsSliceSummary      string `json:"pointsSliceSummary"`
+	PointsV2                bool   `json:"pointsV2"`
+}
+
+// rankingsLastCommitJSON stores the last merged addon payload so a later commit can
+// combine a new single-slice fetch with the previous slice (e.g. Points V2 then Performance).
+const rankingsLastCommitJSON = "RankingsPayload.last-commit.json"
+
+// mergeAddonRankingsForCommit fills empty performance or points slices in incoming from disk.
+func mergeAddonRankingsForCommit(disk, incoming *addonRankingsResponse) *addonRankingsResponse {
+	if disk == nil {
+		return incoming
+	}
+	if incoming == nil {
+		return disk
+	}
+	if disk.Realm != "" && incoming.Realm != "" && disk.Realm != incoming.Realm {
+		return incoming
+	}
+	if disk.Season > 0 && incoming.Season > 0 && disk.Season != incoming.Season {
+		return incoming
+	}
+	out := *incoming
+	if len(incoming.PerformanceRows) == 0 && len(disk.PerformanceRows) > 0 {
+		out.PerformanceRows = disk.PerformanceRows
+		out.PerformanceFilters = disk.PerformanceFilters
+		if out.ExportMeta == nil {
+			out.ExportMeta = disk.ExportMeta
+		} else if disk.ExportMeta != nil {
+			if out.ExportMeta.PerformanceSliceSummary == "" {
+				out.ExportMeta.PerformanceSliceSummary = disk.ExportMeta.PerformanceSliceSummary
+			}
+		}
+	}
+	if len(incoming.Rows) == 0 && len(disk.Rows) > 0 {
+		out.Rows = disk.Rows
+		out.Filters = disk.Filters
+		out.PointsV2 = disk.PointsV2
+		out.PointsSliceSummary = disk.PointsSliceSummary
+		if out.ExportMeta == nil {
+			out.ExportMeta = disk.ExportMeta
+		} else if disk.ExportMeta != nil {
+			if out.ExportMeta.PointsSliceSummary == "" {
+				out.ExportMeta.PointsSliceSummary = disk.ExportMeta.PointsSliceSummary
+			}
+			if !out.ExportMeta.PointsV2 && disk.ExportMeta.PointsV2 {
+				out.ExportMeta.PointsV2 = true
+			}
+		}
+	}
+	out.PerformanceCount = len(out.PerformanceRows)
+	out.PointsCount = len(out.Rows)
+	if !out.PointsV2 && disk.PointsV2 && len(out.Rows) > 0 {
+		out.PointsV2 = true
+	}
+	return &out
 }
 
 func escapeLuaString(input string) string {
@@ -545,7 +658,71 @@ func escapeLuaString(input string) string {
 	return replacer.Replace(input)
 }
 
-func buildSavedVariablesLua(payload *addonRankingsResponse) string {
+// commitAddonRankingsResponseBody writes bulk rankings to Interface/AddOns/WowLogsAddon/src/RankingsPayload.lua
+// (must match WowLogsAddon.toc load order; not SavedVariables).
+
+func (a *App) commitAddonRankingsResponseBody(respBody []byte) (string, error) {
+	if len(respBody) > 20*1024*1024 {
+		return "", fmt.Errorf("API response is unusually large; refusing to write")
+	}
+
+	wowDir := strings.TrimSpace(a.config.WowDirectory)
+	if wowDir == "" {
+		return "", fmt.Errorf("wow directory is not configured")
+	}
+
+	var payload addonRankingsResponse
+	if err := json.Unmarshal(respBody, &payload); err != nil {
+		return "", fmt.Errorf("failed to parse addon rankings response: %w", err)
+	}
+
+	addonDir := filepath.Join(wowDir, "Interface", "AddOns", "WowLogsAddon")
+	srcDir := filepath.Join(addonDir, "src")
+	if err := os.MkdirAll(srcDir, os.ModePerm); err != nil {
+		return "", fmt.Errorf("could not create addon src directory (%s): %w", srcDir, err)
+	}
+
+	sidecarPath := filepath.Join(srcDir, rankingsLastCommitJSON)
+	if b, err := os.ReadFile(sidecarPath); err == nil && len(b) > 0 {
+		var disk addonRankingsResponse
+		if err := json.Unmarshal(b, &disk); err == nil {
+			payload = *mergeAddonRankingsForCommit(&disk, &payload)
+		}
+	}
+
+	payloadLua := buildRankingsPayloadLua(&payload)
+	if len(payloadLua) > maxAddonLuaBytes {
+		return "", fmt.Errorf(
+			"generated rankings payload (~%d bytes) exceeds safe limit (%d bytes); use performance filters or lower bucketCap",
+			len(payloadLua), maxAddonLuaBytes,
+		)
+	}
+
+	payloadPath := filepath.Join(srcDir, "RankingsPayload.lua")
+	payloadFile := "-- Written by WoW Logs Native Uploader; loaded from disk on each /reload.\n" + payloadLua
+	if err := os.WriteFile(payloadPath, []byte(payloadFile), 0644); err != nil {
+		return "", fmt.Errorf("failed to write RankingsPayload.lua: %w", err)
+	}
+	if sidecarBytes, err := json.Marshal(&payload); err == nil {
+		_ = os.WriteFile(sidecarPath, sidecarBytes, 0644)
+	}
+	// Earlier builds wrote the payload at addon root; that path is not in the .toc — remove to avoid confusion.
+	_ = os.Remove(filepath.Join(addonDir, "RankingsPayload.lua"))
+	log.Printf("[Go Backend] Wrote rankings payload to %s\n", payloadPath)
+
+	premiumSuffix := ""
+	if payload.IsPremium {
+		premiumSuffix = " [Premium ✓]"
+	}
+	return fmt.Sprintf(
+		"Updated %d points rows and %d performance rows for %s (Season %d)%s.\n\nWrote Interface\\\\AddOns\\\\WowLogsAddon\\\\src\\\\RankingsPayload.lua — /reload in WoW to show this slice. Ensure your addon .toc lists src\\\\RankingsPayload.lua before DataStore.lua (v1.2.2+). SavedVariables were not modified.",
+		payload.PointsCount, payload.PerformanceCount, payload.Realm, payload.Season, premiumSuffix,
+	), nil
+}
+
+// buildRankingsPayloadLua writes WowLogsRankingsPayload for src/RankingsPayload.lua (see .toc).
+// That file is re-parsed from disk on every /reload, so Native Uploader can refresh ranks while WoW is running.
+func buildRankingsPayloadLua(payload *addonRankingsResponse) string {
 	var sb strings.Builder
 	nowUnix := time.Now().Unix()
 
@@ -564,15 +741,26 @@ func buildSavedVariablesLua(payload *addonRankingsResponse) string {
 		return id
 	}
 
-	sb.WriteString("WowLogsAddonDB = {\n")
-	sb.WriteString("  meta = { version = 2 },\n")
-	sb.WriteString(fmt.Sprintf("  rankings = { updatedAt = %d, serverName = \"%s\", realm = \"%s\", season = %d, isPremium = %v, players = {},\n",
+	sb.WriteString("WowLogsRankingsPayload = {\n")
+	sb.WriteString(fmt.Sprintf("    updatedAt = %d, serverName = \"%s\", realm = \"%s\", season = %d, isPremium = %v, players = {},\n",
 		nowUnix,
 		escapeLuaString(payload.ServerName),
 		escapeLuaString(payload.Realm),
 		payload.Season,
 		payload.IsPremium,
 	))
+	sliceSummary := ""
+	if payload.ExportMeta != nil {
+		sliceSummary = payload.ExportMeta.PerformanceSliceSummary
+	}
+	sb.WriteString(fmt.Sprintf("    performanceSliceSummary = \"%s\",\n", escapeLuaString(sliceSummary)))
+
+	pointsSum := payload.PointsSliceSummary
+	if pointsSum == "" && payload.ExportMeta != nil {
+		pointsSum = payload.ExportMeta.PointsSliceSummary
+	}
+	sb.WriteString(fmt.Sprintf("    pointsSliceSummary = \"%s\",\n", escapeLuaString(pointsSum)))
+	sb.WriteString(fmt.Sprintf("    pointsV2 = %v,\n", payload.PointsV2))
 
 	sb.WriteString("    filters = {\n")
 	// For filters, we leave them un-minified so the UI filter dropdowns work easily, 
@@ -642,10 +830,6 @@ func buildSavedVariablesLua(payload *addonRankingsResponse) string {
 
 	sb.WriteString("    rows = {\n")
 	for _, r := range payload.Rows {
-		raidID := "nil"
-		if r.RaidID != nil {
-			raidID = fmt.Sprintf("%d", *r.RaidID)
-		}
 		categoryRank := "nil"
 		if r.CategoryRank != nil {
 			categoryRank = fmt.Sprintf("%d", *r.CategoryRank)
@@ -656,7 +840,30 @@ func buildSavedVariablesLua(payload *addonRankingsResponse) string {
 			isFollowedStr = "true"
 		}
 
-		// CSV String format for rows:
+		if payload.PointsV2 {
+			// V2: key,playerName,classID,specID,roleID,points,specPct,classPct,rolePct,categoryRank,isFollowed
+			sb.WriteString(fmt.Sprintf("      \"%s,%s,%d,%d,%d,%.2f,%.2f,%.2f,%.2f,%s,%s\",\n",
+				escapeLuaString(r.Key),
+				escapeLuaString(r.PlayerName),
+				getStrId(r.PlayerClass),
+				getStrId(r.PlayerSpec),
+				getStrId(r.Role),
+				r.Points,
+				r.SpecPercentileV2,
+				r.ClassPercentileV2,
+				r.RolePercentileV2,
+				categoryRank,
+				isFollowedStr,
+			))
+			continue
+		}
+
+		raidID := "nil"
+		if r.RaidID != nil {
+			raidID = fmt.Sprintf("%d", *r.RaidID)
+		}
+
+		// CSV String format for rows (legacy V1-style bucket rows):
 		// key,playerName,classID,specID,raidId,raidNameID,bossId,bossNameID,difficultyID,points,percentile,categoryRank,isFollowed
 		sb.WriteString(fmt.Sprintf("      \"%s,%s,%d,%d,%s,%d,%d,%d,%d,%.2f,%.2f,%s,%s\",\n",
 			escapeLuaString(r.Key),
@@ -787,66 +994,166 @@ func buildSavedVariablesLua(payload *addonRankingsResponse) string {
 	}
 	sb.WriteString("    },\n")
 
-	// Emit Dictionary at the end of rankings structure, before closing WowLogsAddonDB
+	// Emit Dictionary at the end of the payload table.
 	sb.WriteString("    dict = {\n")
 	for i, s := range dictStrings {
 		sb.WriteString(fmt.Sprintf("      [%d] = \"%s\",\n", i+1, escapeLuaString(s)))
 	}
 	sb.WriteString("    },\n")
 
-	sb.WriteString("  },\n")
 	sb.WriteString("}\n")
 	return sb.String()
 }
 
-func (a *App) UpdateAddonRankings(serverName string, season int) (string, error) {
-	if strings.TrimSpace(serverName) == "" {
-		return "", fmt.Errorf("server is required")
-	}
-	wowDir := strings.TrimSpace(a.config.WowDirectory)
-	if wowDir == "" {
-		return "", fmt.Errorf("wow directory is not configured")
-	}
+// Max size for generated RankingsPayload.lua before we refuse to write (WoW 3.3.x load limits).
+const maxAddonLuaBytes = 4 * 1024 * 1024
 
-	accountDir := filepath.Join(wowDir, "WTF", "Account")
-	entries, err := os.ReadDir(accountDir)
+// GetApiBaseURL returns the API base URL (dev vs prod) for optional direct fetches from the UI layer.
+func (a *App) GetApiBaseURL() string {
+	return a.apiBaseURL
+}
+
+// fetchJSONGET performs a server-side GET to the Node API (avoids browser CORS from the Wails webview).
+func (a *App) fetchJSONGET(pathQuery string) ([]byte, error) {
+	base := strings.TrimRight(strings.TrimSpace(a.apiBaseURL), "/")
+	if base == "" {
+		return nil, fmt.Errorf("API base URL is not configured")
+	}
+	urlStr := base + pathQuery
+	client := &http.Client{Timeout: 30 * time.Second}
+	req, err := http.NewRequest("GET", urlStr, nil)
 	if err != nil {
-		return "", fmt.Errorf("could not read account directory (%s): %w", accountDir, err)
+		return nil, err
 	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%s: %s", resp.Status, strings.TrimSpace(string(body)))
+	}
+	return body, nil
+}
 
-	var accountPaths []string
-	for _, entry := range entries {
-		if entry.IsDir() {
-			svDir := filepath.Join(accountDir, entry.Name(), "SavedVariables")
-			accountPaths = append(accountPaths, filepath.Join(svDir, "WowLogsAddon.lua"))
+// FetchLeaderboardFilterRaidsJSON returns JSON array of {label,value} for /api/rankings/filters/raids.
+func (a *App) FetchLeaderboardFilterRaidsJSON(serverID int, season int) (string, error) {
+	if serverID <= 0 {
+		return "", fmt.Errorf("invalid serverId (select a server with a numeric id from the API list)")
+	}
+	q := url.Values{}
+	q.Set("serverId", strconv.Itoa(serverID))
+	if season > 0 {
+		q.Set("season", strconv.Itoa(season))
+	}
+	body, err := a.fetchJSONGET("/api/rankings/filters/raids?" + q.Encode())
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
+}
+
+// FetchLeaderboardFilterDifficultiesJSON returns JSON for /api/rankings/filters/difficulties.
+func (a *App) FetchLeaderboardFilterDifficultiesJSON(serverID, raidID int, season int) (string, error) {
+	if serverID <= 0 || raidID <= 0 {
+		return "", fmt.Errorf("invalid serverId or raidId")
+	}
+	q := url.Values{}
+	q.Set("serverId", strconv.Itoa(serverID))
+	q.Set("raidId", strconv.Itoa(raidID))
+	if season > 0 {
+		q.Set("season", strconv.Itoa(season))
+	}
+	body, err := a.fetchJSONGET("/api/rankings/filters/difficulties?" + q.Encode())
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
+}
+
+// FetchLeaderboardFilterBossesJSON returns JSON for /api/rankings/filters/bosses.
+func (a *App) FetchLeaderboardFilterBossesJSON(serverID, raidID int, difficulty string, season int) (string, error) {
+	if serverID <= 0 || raidID <= 0 {
+		return "", fmt.Errorf("invalid serverId or raidId")
+	}
+	difficulty = strings.TrimSpace(difficulty)
+	if difficulty == "" {
+		return "", fmt.Errorf("difficulty is required")
+	}
+	q := url.Values{}
+	q.Set("serverId", strconv.Itoa(serverID))
+	q.Set("raidId", strconv.Itoa(raidID))
+	q.Set("difficulty", difficulty)
+	if season > 0 {
+		q.Set("season", strconv.Itoa(season))
+	}
+	body, err := a.fetchJSONGET("/api/rankings/filters/bosses?" + q.Encode())
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
+}
+
+// FetchLeaderboardSeasonsConfigJSON returns JSON for /api/rankings/filters/seasons-config.
+func (a *App) FetchLeaderboardSeasonsConfigJSON() (string, error) {
+	body, err := a.fetchJSONGET("/api/rankings/filters/seasons-config")
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
+}
+
+func mergeAddonQueryJSON(extraJSON string, q url.Values) error {
+	s := strings.TrimSpace(extraJSON)
+	if s == "" || s == "{}" {
+		return nil
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal([]byte(s), &m); err != nil {
+		return fmt.Errorf("invalid filter JSON: %w", err)
+	}
+	for k, v := range m {
+		if v == nil {
+			continue
+		}
+		switch t := v.(type) {
+		case string:
+			if t == "" {
+				continue
+			}
+			q.Set(k, t)
+		case float64:
+			if t == float64(int64(t)) {
+				q.Set(k, strconv.FormatInt(int64(t), 10))
+			} else {
+				q.Set(k, strconv.FormatFloat(t, 'f', -1, 64))
+			}
+		case bool:
+			q.Set(k, strconv.FormatBool(t))
+		default:
+			q.Set(k, fmt.Sprintf("%v", v))
 		}
 	}
+	return nil
+}
 
-	if len(accountPaths) == 0 {
-		return "", fmt.Errorf("no accounts found in %s", accountDir)
+func (a *App) fetchAddonRankingsFullQuery(q url.Values) ([]byte, error) {
+	fp := strings.TrimSpace(a.config.FollowedPlayers)
+	if fp != "" && q.Get("followedPlayers") == "" {
+		q.Set("followedPlayers", fp)
 	}
-
-	q := url.Values{}
-	q.Set("serverName", serverName)
-	if season > 0 {
-		q.Set("season", fmt.Sprintf("%d", season))
-	}
-
-	// Add followed players to query if set
-	followedPlayers := strings.TrimSpace(a.config.FollowedPlayers)
-	if followedPlayers != "" {
-		q.Set("followedPlayers", followedPlayers)
-	}
-
 	apiURL := fmt.Sprintf("%s/api/v5/uploader/addon-rankings-full?%s", a.apiBaseURL, q.Encode())
-	client := &http.Client{Timeout: 45 * time.Second}
+	client := &http.Client{Timeout: 90 * time.Second}
 
 	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to create rankings request: %w", err)
+		return nil, fmt.Errorf("failed to create rankings request: %w", err)
 	}
 
-	// Send API token if configured (for premium features)
 	apiToken := strings.TrimSpace(a.config.ApiToken)
 	if apiToken != "" {
 		req.Header.Set("X-API-Token", apiToken)
@@ -854,47 +1161,68 @@ func (a *App) UpdateAddonRankings(serverName string, season int) (string, error)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch addon rankings: %w", err)
+		return nil, fmt.Errorf("failed to fetch addon rankings: %w", err)
 	}
 	defer resp.Body.Close()
 
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("rankings endpoint error: %s (%s)", resp.Status, strings.TrimSpace(string(body)))
+		return nil, fmt.Errorf("rankings endpoint error: %s (%s)", resp.Status, strings.TrimSpace(string(body)))
+	}
+	return body, nil
+}
+
+// BrowseAddonRankingsJSON fetches the addon export JSON for display in the uploader (no disk write).
+// extraQueryJSON merges into the query string (e.g. {"syncMode":"performance","bossId":48,"difficulty":"TWENTY_FIVE_HC","role":"HEALER","ladder":"Regular"}).
+func (a *App) BrowseAddonRankingsJSON(serverName string, season int, extraQueryJSON string) (string, error) {
+	q := url.Values{}
+	if strings.TrimSpace(serverName) != "" {
+		q.Set("serverName", strings.TrimSpace(serverName))
+	}
+	if err := mergeAddonQueryJSON(extraQueryJSON, q); err != nil {
+		return "", err
+	}
+	if q.Get("syncMode") == "" {
+		q.Set("syncMode", "full")
+	}
+	if season > 0 && q.Get("season") == "" {
+		q.Set("season", fmt.Sprintf("%d", season))
+	}
+	if q.Get("serverName") == "" && q.Get("serverId") == "" {
+		return "", fmt.Errorf("serverName or serverId is required (set server in filters or select a server)")
 	}
 
-	var payload addonRankingsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return "", fmt.Errorf("failed to parse addon rankings response: %w", err)
+	body, err := a.fetchAddonRankingsFullQuery(q)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
+}
+
+// CommitAddonRankingsJSON writes src/RankingsPayload.lua under the WowLogs addon folder from JSON.
+func (a *App) CommitAddonRankingsJSON(jsonPayload string) (string, error) {
+	return a.commitAddonRankingsResponseBody([]byte(jsonPayload))
+}
+
+func (a *App) UpdateAddonRankings(serverName string, season int) (string, error) {
+	if strings.TrimSpace(serverName) == "" {
+		return "", fmt.Errorf("server is required")
+	}
+	q := url.Values{}
+	q.Set("serverName", strings.TrimSpace(serverName))
+	q.Set("syncMode", "full")
+	if season > 0 {
+		q.Set("season", fmt.Sprintf("%d", season))
 	}
 
-	luaData := buildSavedVariablesLua(&payload)
-	
-	successCount := 0
-	for _, path := range accountPaths {
-		svDir := filepath.Dir(path)
-		if err := os.MkdirAll(svDir, os.ModePerm); err != nil {
-			log.Printf("[Go Backend] Could not create directory %s: %v\n", svDir, err)
-			continue
-		}
-
-		if err := os.WriteFile(path, []byte(luaData), 0644); err != nil {
-			log.Printf("[Go Backend] Failed to write to %s: %v\n", path, err)
-		} else {
-			log.Printf("[Go Backend] Successfully updated rankings at %s\n", path)
-			successCount++
-		}
+	body, err := a.fetchAddonRankingsFullQuery(q)
+	if err != nil {
+		return "", err
 	}
-
-	if successCount == 0 {
-		return "", fmt.Errorf("failed to write addon file to any account directory")
-	}
-
-	premiumSuffix := ""
-	if payload.IsPremium {
-		premiumSuffix = " [Premium ✓]"
-	}
-	return fmt.Sprintf("Updated %d points rows and %d performance rows for %s (Season %d)%s.\n\nSuccessfully synced to %d account(s).\n\n⚠️ Please LOGOUT and log back in (do NOT use /reload if installing for the first time).", payload.PointsCount, payload.PerformanceCount, payload.Realm, payload.Season, premiumSuffix, successCount), nil
+	return a.commitAddonRankingsResponseBody(body)
 }
 
 // GetPremiumConfig returns current premium settings (token type, token, and followed players)

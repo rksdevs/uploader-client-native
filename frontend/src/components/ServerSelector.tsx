@@ -1,4 +1,5 @@
 import React from "react";
+import { ChevronDown } from "lucide-react";
 
 export interface ServerOption {
   id?: number;
@@ -20,21 +21,27 @@ const ServerSelector: React.FC<ServerSelectorProps> = ({
   serverOptions,
 }) => {
   return (
-    <div className="component-container">
-      <label htmlFor="server-select">2. Choose Your Server</label>
+    <div className="select-like-wrap">
       <select
         id="server-select"
+        className="input-like-select"
         value={selectedValue}
         onChange={(e) => onSelect(e.target.value)}
         disabled={disabled}
       >
-        <option value="">Select a Server...</option>
+        <option value="">Select a server…</option>
         {serverOptions.map((opt) => (
           <option key={`${opt.value}-${opt.id ?? "na"}`} value={opt.value}>
             {opt.label}
           </option>
         ))}
       </select>
+      <ChevronDown
+        className="select-like-wrap__chevron"
+        size={20}
+        strokeWidth={2}
+        aria-hidden
+      />
     </div>
   );
 };

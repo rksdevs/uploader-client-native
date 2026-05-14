@@ -1,4 +1,5 @@
 import React from "react";
+import { FolderOpen } from "lucide-react";
 
 interface DirectorySelectorProps {
   onSelect: () => void;
@@ -10,12 +11,15 @@ const DirectorySelector: React.FC<DirectorySelectorProps> = ({
   disabled,
 }) => {
   return (
-    <div className="component-container">
-      <label>1. Select WoW Logs Folder</label>
-      <button onClick={onSelect} className="btn" disabled={disabled}>
-        Choose Directory
-      </button>
-    </div>
+    <button
+      type="button"
+      onClick={onSelect}
+      className="btn-gradient-primary btn-with-icon"
+      disabled={disabled}
+    >
+      <FolderOpen size={18} strokeWidth={2} aria-hidden />
+      Choose Logs directory
+    </button>
   );
 };
 

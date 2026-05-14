@@ -15,15 +15,18 @@ func main() {
 	app := NewApp()
 
 	err := wails.Run(&options.App{
-		Title:     "native-uploader",
-		Width:     1024,
-		Height:    900,
-		MinWidth:  800,
-		MinHeight: 700,
+		Title:            "WoW Logs Uploader",
+		Width:            1280,
+		Height:           800,
+		MinWidth:         720,
+		MinHeight:        560,
+		// Maximised (not Fullscreen): keeps title bar, min/max/close, resize, and taskbar visible.
+		WindowStartState: options.Maximised,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
+		// Slate-900 — matches redesigned shell while WebView loads
+		BackgroundColour: &options.RGBA{R: 15, G: 23, B: 42, A: 1},
 		OnStartup:        app.startup,
 		Bind: []interface{}{
 			app,

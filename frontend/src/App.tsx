@@ -1,5 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import "./App.css";
+import { Toaster } from "sonner";
+import {
+  BarChart3,
+  Crown,
+  FileText,
+  FolderOpen,
+  Info,
+  Moon,
+  Sun,
+} from "lucide-react";
 import {
   PreprocessLog,
   EnqueueJobs,
@@ -11,28 +21,22 @@ import {
   OpenLogPage,
   GetWowDirectory,
   SelectWowDirectory,
-  UpdateAddonRankings,
   GetPremiumConfig,
   SavePremiumConfig,
   GetTheme,
   SetTheme,
 } from "../wailsjs/go/main/App";
 import { main } from "../wailsjs/go/models";
-import {
-  EventsOn,
-  EventsOff,
-  LogInfo,
-  BrowserOpenURL,
-} from "../wailsjs/runtime";
+import { EventsOn, BrowserOpenURL } from "../wailsjs/runtime";
 import { toast } from "sonner";
 
-import StatusDisplay from "./components/StatusDisplay";
 import DirectorySelector from "./components/DirectorySelector";
 import ServerSelector, { ServerOption } from "./components/ServerSelector";
 import UploadButton from "./components/UploadButton";
 import InstanceSelector from "./components/InstanceSelector";
 import ConfirmationModal from "./components/ConfirmationModal";
 import AddonPathHelpModal from "./components/AddonPathHelpModal";
+import RankingsBrowser from "./components/RankingsBrowser";
 import { Instance, JobNotification } from "./types";
 
 function App() {
@@ -42,7 +46,6 @@ function App() {
     "Loading saved settings..."
   );
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [isUpdatingRankings, setIsUpdatingRankings] = useState<boolean>(false);
   const [view, setView] = useState<"upload" | "select">("upload");
   const [preprocessId, setPreprocessId] = useState<number | null>(null);
   const [instances, setInstances] = useState<Instance[]>([]);
@@ -58,6 +61,31 @@ function App() {
   const [showClearConfirm, setShowClearConfirm] = useState<boolean>(false);
   const [showAddonHelp, setShowAddonHelp] = useState<boolean>(false);
   const [theme, setTheme] = useState<string>("light");
+
+  const loadServers = useCallback((silent?: boolean) => {
+    GetUploaderServers()
+      .then((servers: ServerOption[]) => {
+        if (!Array.isArray(servers) || servers.length === 0) {
+          if (!silent) {
+            toast.warning("Server list is empty.");
+          }
+          return;
+        }
+        setServerOptions(servers);
+        setSelectedServer((prev) =>
+          prev && !servers.some((s) => s.value === prev) ? "" : prev
+        );
+        if (!silent) {
+          toast.success(`Server list updated (${servers.length}).`);
+        }
+      })
+      .catch((err: unknown) => {
+        console.error("[React App] Error fetching uploader servers:", err);
+        toast.error("Failed to fetch server list.", {
+          description: String(err),
+        });
+      });
+  }, []);
 
   useEffect(() => {
     GetSavedDirectory()
@@ -76,17 +104,7 @@ function App() {
         );
       });
 
-    GetUploaderServers()
-      .then((servers: ServerOption[]) => {
-        if (!Array.isArray(servers) || servers.length === 0) {
-          return;
-        }
-        setServerOptions(servers);
-      })
-      .catch((err: unknown) => {
-        console.error("[React App] Error fetching uploader servers:", err);
-        toast.error("Failed to fetch latest server list.");
-      });
+    loadServers(true);
 
     GetWowDirectory()
       .then((savedPath: string) => {
@@ -115,7 +133,7 @@ function App() {
       .catch((err: unknown) => {
         console.error("[React App] Error loading theme:", err);
       });
-  }, []);
+  }, [loadServers]);
 
   useEffect(() => {
     const cleanup = EventsOn("job_notification", (data: JobNotification) => {
@@ -171,28 +189,6 @@ function App() {
       });
   };
 
-  const handleUpdateRankings = () => {
-    if (!selectedServer) {
-      toast.error("Select a server before updating rankings.");
-      return;
-    }
-
-    setIsUpdatingRankings(true);
-    UpdateAddonRankings(selectedServer, 0)
-      .then((message) => {
-        toast.success(message, {
-          description: "Run /reload in-game to load fresh rankings.",
-          duration: 12000,
-        });
-      })
-      .catch((err) => {
-        toast.error("Failed to update addon rankings", {
-          description: String(err),
-        });
-      })
-      .finally(() => setIsUpdatingRankings(false));
-  };
-
   const handleSavePremiumConfig = () => {
     setIsSavingPremium(true);
     SavePremiumConfig(apiToken, apiTokenType, followedPlayers)
@@ -234,7 +230,7 @@ function App() {
   const toggleTheme = () => {
     const newTheme = theme === "light" ? "dark" : "light";
     setTheme(newTheme);
-    SetTheme(newTheme).catch((err: any) => {
+    SetTheme(newTheme).catch((err: unknown) => {
       console.error("[React App] Failed to save theme:", err);
     });
   };
@@ -304,6 +300,22 @@ function App() {
     }
   };
 
+  const selectedServerNumericId = useMemo(() => {
+    const opt = serverOptions.find((o) => o.value === selectedServer);
+    return opt?.id ?? null;
+  }, [serverOptions, selectedServer]);
+
+  const activityBannerMessage = useMemo(() => {
+    const trimmedLogs = logDirectory.trim();
+    const redundantMonitoring =
+      trimmedLogs !== "" &&
+      statusMessage === `Monitoring logs in: ${logDirectory}`;
+    if (!statusMessage || redundantMonitoring) {
+      return null;
+    }
+    return statusMessage;
+  }, [statusMessage, logDirectory]);
+
   const resetToUploadView = () => {
     setView("upload");
     setInstances([]);
@@ -314,91 +326,188 @@ function App() {
     } else {
       setStatusMessage("Please select your WoW Logs directory to begin.");
     }
+    loadServers(true);
   };
 
+  const themeClass = theme === "dark" ? "dark-theme" : "light-theme";
+
   return (
-    <div id="App" className={theme === "dark" ? "dark-theme" : ""}>
-      <div className="container">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.25rem" }}>
-          <div style={{ width: "32px" }}></div>
-          <h1 style={{ margin: 0 }}>WoW Logs Uploader</h1>
-          <button 
-            onClick={toggleTheme}
-            className="theme-toggle"
-            title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
-          >
-            {theme === "light" ? "🌙 Dark Mode" : "☀️ Light Mode"}
-          </button>
-        </div>
-        {view === "upload" ? (
-          <>
-            <StatusDisplay message={statusMessage} />
-            <DirectorySelector
-              onSelect={handleSelectDirectory}
-              disabled={isProcessing || isUpdatingRankings}
-            />
-            <ServerSelector
-              selectedValue={selectedServer}
-              onSelect={setSelectedServer}
-              disabled={isProcessing || isUpdatingRankings}
-              serverOptions={serverOptions}
-            />
-
-            <div className="addon-path-hint" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              WoW Folder (Auto-Syncs all accounts): {wowDirectory || <span style={{ opacity: 0.7, fontSize: '11px' }}>&lt;wow-directory&gt; (e.g. E:\World of Warcraft 3.3.5a)</span>}
-              <button 
-                onClick={() => setShowAddonHelp(true)}
-                style={{ 
-                  background: "none", 
-                  border: "none", 
-                  cursor: "pointer", 
-                  padding: "0",
-                  lineHeight: 0,
-                  opacity: 0.6,
-                  transition: "opacity 0.15s",
-                }}
-                title="How to find this file"
-                onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
-                onMouseLeave={e => (e.currentTarget.style.opacity = "0.6")}
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="12" y1="8" x2="12" y2="8.01"/>
-                  <line x1="12" y1="12" x2="12" y2="16"/>
-                </svg>
-              </button>
-              {apiToken && <span className="premium-badge"> ★ Premium</span>}
+    <div id="App" className={`app-root ${themeClass}`}>
+      <Toaster
+        richColors
+        closeButton
+        position="top-center"
+        theme={theme === "dark" ? "dark" : "light"}
+      />
+      <div className="app-gradient-shell">
+        <div className="app-inner">
+          <header className="app-header">
+            <div className="app-header-brand">
+              <div className="app-logo-tile" aria-hidden>
+                <BarChart3 size={28} strokeWidth={2} />
+              </div>
+              <div>
+                <h1 className="app-title">WoW Logs Uploader</h1>
+                <p className="app-subtitle">Combat log analysis made easy</p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="theme-icon-btn"
+              title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+              aria-label={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
+            >
+              {theme === "light" ? (
+                <Moon size={20} strokeWidth={2} className="theme-icon-moon" />
+              ) : (
+                <Sun size={20} strokeWidth={2} className="theme-icon-sun" />
+              )}
+            </button>
+          </header>
 
-            <div className="premium-settings-section">
+          {view === "upload" ? (
+            <>
+              <div className="redesign-card monitored-paths-card">
+                <div className="paths-block">
+                  <div className="paths-block__head">
+                    <span className="paths-block__label">Logs monitored</span>
+                  </div>
+                  <div className="mono-path-box mono-path-box--tight">
+                    {logDirectory.trim() !== "" ? (
+                      logDirectory
+                    ) : (
+                      <span className="mono-path-placeholder">
+                        No combat logs folder selected yet. Use step 1 below.
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="paths-block paths-block--wow">
+                  <div className="paths-block__head">
+                    <Info size={16} strokeWidth={2} className="card-head-icon" aria-hidden />
+                    <span className="paths-block__label">WoW directory monitored</span>
+                    <button
+                      type="button"
+                      className="help-icon-btn"
+                      onClick={() => setShowAddonHelp(true)}
+                      title="Where to find your WoW install"
+                      aria-label="Help: WoW folder path"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="8.01" />
+                        <line x1="12" y1="12" x2="12" y2="16" />
+                      </svg>
+                    </button>
+                    {apiToken ? (
+                      <span className="premium-chip-inline">
+                        <Crown size={14} strokeWidth={2} aria-hidden /> Premium
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="paths-block__hint">
+                    Game install root. Rankings and addon files sync under Interface/AddOns.
+                  </p>
+                  <div className="mono-path-box mono-path-box--tight">
+                    {wowDirectory ? (
+                      wowDirectory
+                    ) : (
+                      <span className="mono-path-placeholder">
+                        &lt;wow-directory&gt; (e.g. E:\World of Warcraft 3.3.5a)
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-surface btn-with-icon paths-block__action"
+                    onClick={handleSelectWowDirectory}
+                    disabled={isProcessing}
+                  >
+                    <FolderOpen size={18} strokeWidth={2} aria-hidden />
+                    {!wowDirectory ? "Link WoW directory" : "Change WoW directory"}
+                  </button>
+                </div>
+
+                {activityBannerMessage ? (
+                  <div className="paths-activity-strip" role="status">
+                    {activityBannerMessage}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="redesign-card setup-card">
+                <div className="setup-step">
+                  <div className="step-badge">1</div>
+                  <div className="setup-step-body">
+                    <span className="step-title">Combat logs folder</span>
+                    <DirectorySelector
+                      onSelect={handleSelectDirectory}
+                      disabled={isProcessing}
+                    />
+                  </div>
+                </div>
+                <div className="setup-step">
+                  <div className="step-badge">2</div>
+                  <div className="setup-step-body setup-step-body--grow">
+                    <span className="step-title">Choose your server</span>
+                    <div className="server-row">
+                      <ServerSelector
+                        selectedValue={selectedServer}
+                        onSelect={setSelectedServer}
+                        disabled={isProcessing}
+                        serverOptions={serverOptions}
+                      />
+                      <button
+                        type="button"
+                        className="btn-outline-refresh"
+                        onClick={() => loadServers(false)}
+                        disabled={isProcessing}
+                        title="Re-fetch servers from the API (use after adding realms in the database)"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <button
-                className="btn btn-ghost btn-sm"
+                type="button"
+                className="premium-strip-toggle"
                 onClick={() => setShowPremiumSettings(!showPremiumSettings)}
               >
-                {showPremiumSettings ? "▲ Hide Premium Settings" : "▼ Premium Settings"}
+                <Crown size={16} strokeWidth={2} aria-hidden />
+                <span className="premium-strip-toggle__text">
+                  {showPremiumSettings ? "Hide premium settings" : "Premium settings"}
+                </span>
+                {apiToken ? <span className="premium-strip-active">Active</span> : null}
               </button>
 
-              {showPremiumSettings && (
-                <div className="premium-panel">
+              {showPremiumSettings ? (
+                <div className="redesign-card premium-panel-card">
                   <p className="premium-info">
-                    Enter your API token from <strong>wow-logs.co.in</strong> to enable premium features
-                    (performance trends, custom player list).
+                    Enter your API token from <strong>wow-logs.co.in</strong> to enable premium
+                    features (performance trends, custom player list).
                   </p>
-                  
-                  <div className="token-warning" style={{ 
-                    fontSize: "0.8rem", 
-                    color: "#854d0e", 
-                    marginBottom: "1rem", 
-                    backgroundColor: "#fefce8", 
-                    padding: "10px", 
-                    borderRadius: "6px",
-                    border: "1px solid #fef08a"
-                  }}>
-                    ⚠️ <strong>Do not share your generated token.</strong> Treat it as a Secret key bound to your account. Sharing it publicly might lead to compromising your account details.
+
+                  <div className="token-warning">
+                    <strong>Do not share your generated token.</strong> Treat it as a secret bound
+                    to your account. Sharing it publicly may compromise your account.
                   </div>
 
                   <div className="form-group">
-                    <label>Token Type</label>
+                    <label>Token type</label>
                     <select
                       value={apiTokenType}
                       onChange={(e) => setApiTokenType(e.target.value)}
@@ -410,18 +519,21 @@ function App() {
                   </div>
 
                   <div className="form-group">
-                    <label>API Token</label>
+                    <label>API token</label>
                     <input
                       type="password"
                       className="form-input"
                       value={apiToken}
                       onChange={(e) => setApiToken(e.target.value)}
-                      placeholder="Paste your token from your profile / guild dashboard..."
+                      placeholder="Paste your token from your profile / guild dashboard…"
                     />
                   </div>
 
                   <div className="form-group">
-                    <label>Followed Players <span className="label-hint">(comma-separated, max 5)</span></label>
+                    <label>
+                      Followed players{" "}
+                      <span className="label-hint">(comma-separated, max 5)</span>
+                    </label>
                     <input
                       type="text"
                       className="form-input"
@@ -431,107 +543,80 @@ function App() {
                     />
                   </div>
 
-                  <div style={{ display: "flex", gap: "10px" }}>
+                  <div className="premium-actions">
                     <button
-                      className="btn btn-primary"
+                      type="button"
+                      className="btn-gradient-primary"
                       onClick={handleSavePremiumConfig}
                       disabled={isSavingPremium}
-                      style={{ flex: 1 }}
                     >
-                      {isSavingPremium ? "Saving..." : "Save Settings"}
+                      {isSavingPremium ? "Saving…" : "Save settings"}
                     </button>
-                    {apiToken && (
+                    {apiToken ? (
                       <button
-                        className="btn btn-secondary"
+                        type="button"
+                        className="btn-danger-ghost"
                         onClick={handleClearPremiumConfig}
                         disabled={isSavingPremium}
-                        style={{ flex: 1, backgroundColor: "#fee2e2", color: "#991b1b", border: "1px solid #fecaca" }}
                       >
-                        Clear Data
+                        Clear data
                       </button>
-                    )}
+                    ) : null}
                   </div>
                 </div>
-              )}
-            </div>
+              ) : null}
 
-            <div className="action-row">
-              <button
-                className="btn btn-secondary w-full select-wow-btn"
-                onClick={handleSelectWowDirectory}
-                disabled={isProcessing || isUpdatingRankings}
-              >
-                {!wowDirectory
-                    ? "Link WoW Directory"
-                    : "Change WoW Directory"}
-              </button>
-              <button
-                className="upload-button"
-                onClick={handleUpdateRankings}
-                disabled={
-                  isProcessing ||
-                  isUpdatingRankings ||
-                  !selectedServer ||
-                  !wowDirectory
-                }
-              >
-                {isUpdatingRankings ? "Updating Rankings..." : "Update Rankings"}
-              </button>
-            </div>
+              <div className="action-grid-2">
+                <UploadButton
+                  onUpload={handlePreprocess}
+                  disabled={isProcessing || !logDirectory || !selectedServer}
+                  isProcessing={isProcessing}
+                />
+                <button
+                  type="button"
+                  className="btn-surface btn-with-icon"
+                  onClick={handleViewAllLogs}
+                  disabled={isProcessing}
+                >
+                  <FileText size={18} strokeWidth={2} aria-hidden />
+                  View all logs
+                </button>
+              </div>
 
-            <div className="action-row">
-              <UploadButton
-                onUpload={handlePreprocess}
-                disabled={isProcessing || !logDirectory || !selectedServer}
-                isProcessing={isProcessing}
+              <RankingsBrowser
+                selectedServer={selectedServer}
+                serverNumericId={selectedServerNumericId}
+                wowDirectory={wowDirectory}
+                disabled={isProcessing}
+                theme={theme === "dark" ? "dark" : "light"}
               />
-              <button
-                className="btn btn-secondary"
-                onClick={handleViewAllLogs}
-                disabled={isProcessing || isUpdatingRankings}
-              >
-                View All Logs
-              </button>
+            </>
+          ) : (
+            <div className="redesign-card instance-flow-card">
+              <InstanceSelector
+                instances={instances}
+                onProcess={handleEnqueue}
+                onCancel={resetToUploadView}
+                isProcessing={isProcessing}
+                selectedServer={selectedServer}
+                serverOptions={serverOptions}
+                hasMultipleDetectedServers={hasMultipleDetectedServers}
+              />
             </div>
-          </>
-        ) : (
-          <InstanceSelector
-            instances={instances}
-            onProcess={handleEnqueue}
-            onCancel={resetToUploadView}
-            isProcessing={isProcessing}
-            selectedServer={selectedServer}
-            serverOptions={serverOptions}
-            hasMultipleDetectedServers={hasMultipleDetectedServers}
-          />
-        )}
+          )}
 
-        <div className="footer-links" style={{ 
-          marginTop: "30px", 
-          textAlign: "center", 
-          borderTop: "1px solid #eef2f6", 
-          paddingTop: "15px",
-          display: "flex",
-          justifyContent: "center",
-          gap: "20px",
-          opacity: 0.9
-        }}>
-          <a
-            href="#"
-            style={{ 
-              color: "var(--text-link)", 
-              fontSize: "13px", 
-              fontWeight: "600",
-              textDecoration: "underline",
-              letterSpacing: "0.3px"
-            }}
-            onClick={(e) => {
-              e.preventDefault();
-              BrowserOpenURL("https://github.com/rksdevs/wow-logs-addon/releases/latest");
-            }}
-          >
-            Download Latest WoW Addon
-          </a>
+          <footer className="app-footer-links">
+            <a
+              href="#"
+              className="app-footer-links__a"
+              onClick={(e) => {
+                e.preventDefault();
+                BrowserOpenURL("https://github.com/rksdevs/wow-logs-addon/releases/latest");
+              }}
+            >
+              Download latest WoW addon
+            </a>
+          </footer>
         </div>
       </div>
 
