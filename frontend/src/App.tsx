@@ -611,7 +611,7 @@ function App() {
               className="app-footer-links__a"
               onClick={(e) => {
                 e.preventDefault();
-                BrowserOpenURL("https://github.com/rksdevs/wow-logs-addon/releases/latest");
+                BrowserOpenURL("https://github.com/rksdevs/WowLogsAddon/releases/latest");
               }}
             >
               Download latest WoW addon
