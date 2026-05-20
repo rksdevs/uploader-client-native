@@ -22,6 +22,9 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
+// AppVersion is shown in the uploader header (keep in sync with wails.json info.version).
+const AppVersion = "3.1.0"
+
 type Config struct {
 	LogDirectory            string `json:"logDirectory"`
 	AllLogsURL              string `json:"allLogsURL,omitempty"`
@@ -30,6 +33,11 @@ type Config struct {
 	ApiTokenType            string `json:"apiTokenType,omitempty"` // "personal" or "guild"
 	FollowedPlayers         string `json:"followedPlayers,omitempty"` // comma-separated player names
 	Theme                   string `json:"theme,omitempty"`           // "light" or "dark"
+	WindowWidth             int    `json:"windowWidth,omitempty"`
+	WindowHeight            int    `json:"windowHeight,omitempty"`
+	WindowX                 int    `json:"windowX,omitempty"`
+	WindowY                 int    `json:"windowY,omitempty"`
+	WindowMaximised         bool   `json:"windowMaximised,omitempty"`
 }
 
 type App struct {
@@ -40,6 +48,8 @@ type App struct {
 	pollLock     sync.Mutex
 	config       Config
 	configPath   string
+	windowGeoMu  sync.Mutex
+	windowGeoStop chan struct{}
 }
 
 func fallbackUploaderServers() []UploaderServer {
@@ -184,6 +194,106 @@ func (a *App) startup(ctx context.Context) {
 	if err := a.loadConfig(); err != nil {
 		log.Printf("[Go Backend] Could not load config file (this is normal on first run): %v\n", err)
 	}
+	a.applySavedWindowState()
+	a.startWindowGeometryWatcher()
+}
+
+// GetAppVersion returns the release version shown in the uploader header.
+func (a *App) GetAppVersion() string {
+	return AppVersion
+}
+
+func (a *App) applySavedWindowState() {
+	if a.ctx == nil {
+		return
+	}
+	if a.config.WindowMaximised {
+		runtime.WindowMaximise(a.ctx)
+		return
+	}
+	if a.config.WindowWidth >= 720 && a.config.WindowHeight >= 560 {
+		runtime.WindowSetSize(a.ctx, a.config.WindowWidth, a.config.WindowHeight)
+		runtime.WindowSetPosition(a.ctx, a.config.WindowX, a.config.WindowY)
+		return
+	}
+	// First run: no saved geometry — default to maximised (previous behaviour).
+	runtime.WindowMaximise(a.ctx)
+}
+
+// captureWindowStateSafe reads HWND geometry while the window is alive.
+// Wails panics (divide by zero) if WindowGetSize is called during teardown — never call unchecked on shutdown.
+func (a *App) captureWindowStateSafe() {
+	if a.ctx == nil {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[Go Backend] captureWindowStateSafe skipped: %v\n", r)
+		}
+	}()
+
+	maximised := runtime.WindowIsMaximised(a.ctx)
+	var w, h, x, y int
+	if !maximised {
+		w, h = runtime.WindowGetSize(a.ctx)
+		x, y = runtime.WindowGetPosition(a.ctx)
+	}
+
+	a.windowGeoMu.Lock()
+	defer a.windowGeoMu.Unlock()
+	a.config.WindowMaximised = maximised
+	if !maximised && w >= 720 && h >= 560 {
+		a.config.WindowWidth = w
+		a.config.WindowHeight = h
+		a.config.WindowX = x
+		a.config.WindowY = y
+	}
+}
+
+func (a *App) startWindowGeometryWatcher() {
+	if a.windowGeoStop != nil {
+		return
+	}
+	a.windowGeoStop = make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(1500 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-a.windowGeoStop:
+				return
+			case <-ticker.C:
+				a.captureWindowStateSafe()
+			}
+		}
+	}()
+}
+
+func (a *App) stopWindowGeometryWatcher() {
+	if a.windowGeoStop == nil {
+		return
+	}
+	select {
+	case <-a.windowGeoStop:
+	default:
+		close(a.windowGeoStop)
+	}
+}
+
+func (a *App) saveWindowState() {
+	// Best-effort refresh while HWND may still exist; cached values from the watcher are the fallback.
+	a.captureWindowStateSafe()
+	a.windowGeoMu.Lock()
+	defer a.windowGeoMu.Unlock()
+	if err := a.saveConfig(); err != nil {
+		log.Printf("[Go Backend] Could not save window state: %v\n", err)
+	}
+}
+
+// Shutdown persists window geometry before exit (wired from main.go OnShutdown).
+func (a *App) Shutdown(ctx context.Context) {
+	a.stopWindowGeometryWatcher()
+	a.saveWindowState()
 }
 
 func (a *App) loadConfig() error {
@@ -590,6 +700,23 @@ type addonRankingsResponse struct {
 	PerformanceFilters addonFilters      `json:"performanceFilters"`
 	PerformanceRows    []addonRankingRow `json:"performanceRows"`
 	ExportMeta         *addonExportMeta  `json:"exportMeta"`
+	RaidPartyMeta      *addonRaidPartyMeta `json:"raidPartyMeta,omitempty"`
+	RaidPartyBosses    []string            `json:"raidPartyBosses,omitempty"`
+	RaidPartyRows      []string            `json:"raidPartyRows,omitempty"`
+	GuildRankMeta      *addonGuildRankMeta `json:"guildRankMeta,omitempty"`
+	GuildRankBosses    []string            `json:"guildRankBosses,omitempty"`
+	GuildRankRows      []string            `json:"guildRankRows,omitempty"`
+}
+
+type addonGuildRankMeta struct {
+	GuildID      int    `json:"guildId"`
+	GuildName    string `json:"guildName,omitempty"`
+	RaidID       int    `json:"raidId"`
+	RaidName     string `json:"raidName,omitempty"`
+	Difficulty   string `json:"difficulty"`
+	Season       int    `json:"season"`
+	Ladder       string `json:"ladder"`
+	SliceSummary string `json:"sliceSummary"`
 }
 
 // addonExportMeta holds optional API fields we persist into SavedVariables for the in-game UI.
@@ -597,6 +724,45 @@ type addonExportMeta struct {
 	PerformanceSliceSummary string `json:"performanceSliceSummary"`
 	PointsSliceSummary      string `json:"pointsSliceSummary"`
 	PointsV2                bool   `json:"pointsV2"`
+}
+
+type addonRaidPartyMeta struct {
+	RaidID         int      `json:"raidId"`
+	RaidName       string   `json:"raidName,omitempty"`
+	Difficulty     string   `json:"difficulty"`
+	Season         int      `json:"season"`
+	Ladder         string   `json:"ladder"`
+	GroupType      string   `json:"groupType,omitempty"`
+	MatchedCount   int      `json:"matchedCount"`
+	RequestedCount int      `json:"requestedCount"`
+	SliceSummary   string   `json:"sliceSummary"`
+	NotFound       []string `json:"notFound,omitempty"`
+}
+
+type rosterCharacterRankingsAPIResponse struct {
+	Rankings []struct {
+		PlayerName      string              `json:"playerName"`
+		Class           string              `json:"class"`
+		AvgPercentile   float64             `json:"avgPercentile"`
+		AllStarPoints   float64             `json:"allStarPoints"`
+		SpecPoints      []struct {
+			Spec   string  `json:"spec"`
+			Points float64 `json:"points"`
+		} `json:"specPoints"`
+		BossPercentiles map[string]*float64 `json:"bossPercentiles"`
+	} `json:"rankings"`
+	BossOrder []string `json:"bossOrder"`
+	Meta      struct {
+		ServerID       int      `json:"serverId"`
+		RaidID         int      `json:"raidId"`
+		Difficulty     string   `json:"difficulty"`
+		Season         int      `json:"season"`
+		Ladder         string   `json:"ladder"`
+		GroupType      string   `json:"groupType"`
+		RequestedCount int      `json:"requestedCount"`
+		MatchedCount   int      `json:"matchedCount"`
+		NotFound       []string `json:"notFound"`
+	} `json:"meta"`
 }
 
 // rankingsLastCommitJSON stores the last merged addon payload so a later commit can
@@ -650,7 +816,199 @@ func mergeAddonRankingsForCommit(disk, incoming *addonRankingsResponse) *addonRa
 	if !out.PointsV2 && disk.PointsV2 && len(out.Rows) > 0 {
 		out.PointsV2 = true
 	}
+	if out.RaidPartyMeta == nil && disk.RaidPartyMeta != nil {
+		out.RaidPartyMeta = disk.RaidPartyMeta
+		out.RaidPartyBosses = disk.RaidPartyBosses
+		out.RaidPartyRows = disk.RaidPartyRows
+	}
+	if out.GuildRankMeta == nil && disk.GuildRankMeta != nil {
+		out.GuildRankMeta = disk.GuildRankMeta
+		out.GuildRankBosses = disk.GuildRankBosses
+		out.GuildRankRows = disk.GuildRankRows
+	}
 	return &out
+}
+
+func applyRosterAPIResponseToPayload(payload *addonRankingsResponse, api *rosterCharacterRankingsAPIResponse, raidName string) {
+	if payload == nil || api == nil {
+		return
+	}
+	meta := api.Meta
+	summary := fmt.Sprintf(
+		"Raid/Party · S%d · %s · %s · %s · %d/%d matched",
+		meta.Season,
+		strings.TrimSpace(raidName),
+		meta.Difficulty,
+		meta.Ladder,
+		meta.MatchedCount,
+		meta.RequestedCount,
+	)
+	if len(meta.NotFound) > 0 {
+		summary += fmt.Sprintf(" · %d not on site", len(meta.NotFound))
+	}
+	payload.RaidPartyMeta = &addonRaidPartyMeta{
+		RaidID:         meta.RaidID,
+		RaidName:       raidName,
+		Difficulty:     meta.Difficulty,
+		Season:         meta.Season,
+		Ladder:         meta.Ladder,
+		GroupType:      meta.GroupType,
+		MatchedCount:   meta.MatchedCount,
+		RequestedCount: meta.RequestedCount,
+		SliceSummary:   summary,
+		NotFound:       meta.NotFound,
+	}
+	payload.RaidPartyBosses = append([]string(nil), api.BossOrder...)
+	payload.RaidPartyRows = make([]string, 0, len(api.Rankings))
+	bossOrder := api.BossOrder
+	csvSafe := func(s string) string {
+		return strings.ReplaceAll(strings.ReplaceAll(s, ",", " "), "\"", "")
+	}
+	for _, r := range api.Rankings {
+		// Encode points as "ShortSpec:pts|ShortSpec:pts" when multiple specs exist,
+		// or a plain float when there is only one (or none).
+		var pointsField string
+		if len(r.SpecPoints) > 1 {
+			specParts := make([]string, 0, len(r.SpecPoints))
+			for _, sp := range r.SpecPoints {
+				specParts = append(specParts, fmt.Sprintf("%s:%.2f", specShortName(sp.Spec), sp.Points))
+			}
+			pointsField = strings.Join(specParts, "|")
+		} else {
+			pointsField = fmt.Sprintf("%.2f", r.AllStarPoints)
+		}
+
+		parts := []string{
+			csvSafe(r.PlayerName),
+			csvSafe(r.Class),
+			fmt.Sprintf("%.2f", r.AvgPercentile),
+			pointsField,
+		}
+		for _, bossName := range bossOrder {
+			val := ""
+			if r.BossPercentiles != nil {
+				if p, ok := r.BossPercentiles[bossName]; ok && p != nil {
+					val = fmt.Sprintf("%.1f", *p)
+				}
+			}
+			parts = append(parts, val)
+		}
+		payload.RaidPartyRows = append(payload.RaidPartyRows, strings.Join(parts, ","))
+	}
+}
+
+type guildCharacterRankingsAPIResponse struct {
+	Rankings  []guildCharRankRowAPI `json:"rankings"`
+	BossOrder []string              `json:"bossOrder"`
+	Meta      struct {
+		GuildID    int    `json:"guildId"`
+		GuildName  string `json:"guildName"`
+		ServerID   int    `json:"serverId"`
+		RaidID     int    `json:"raidId"`
+		Difficulty string `json:"difficulty"`
+		Season     int    `json:"season"`
+		Ladder     string `json:"ladder"`
+	} `json:"meta"`
+}
+
+func applyGuildRankingsToPayload(payload *addonRankingsResponse, api *guildCharacterRankingsAPIResponse, guildName, raidName string) {
+	if payload == nil || api == nil {
+		return
+	}
+	meta := api.Meta
+	summary := fmt.Sprintf(
+		"Guild · %s · S%d · %s · %s · %s · %d players",
+		strings.TrimSpace(guildName),
+		meta.Season,
+		strings.TrimSpace(raidName),
+		meta.Difficulty,
+		meta.Ladder,
+		len(api.Rankings),
+	)
+	payload.GuildRankMeta = &addonGuildRankMeta{
+		GuildID:      meta.GuildID,
+		GuildName:    guildName,
+		RaidID:       meta.RaidID,
+		RaidName:     raidName,
+		Difficulty:   meta.Difficulty,
+		Season:       meta.Season,
+		Ladder:       meta.Ladder,
+		SliceSummary: summary,
+	}
+	payload.GuildRankBosses = append([]string(nil), api.BossOrder...)
+	payload.GuildRankRows = make([]string, 0, len(api.Rankings))
+	bossOrder := api.BossOrder
+	csvSafe := func(s string) string {
+		return strings.ReplaceAll(strings.ReplaceAll(s, ",", " "), "\"", "")
+	}
+	for _, r := range api.Rankings {
+		var pointsField string
+		if len(r.SpecPoints) > 1 {
+			specParts := make([]string, 0, len(r.SpecPoints))
+			for _, sp := range r.SpecPoints {
+				specParts = append(specParts, fmt.Sprintf("%s:%.2f", specShortName(sp.Spec), sp.Points))
+			}
+			pointsField = strings.Join(specParts, "|")
+		} else {
+			pointsField = fmt.Sprintf("%.2f", r.AllStarPoints)
+		}
+		parts := []string{
+			csvSafe(r.PlayerName),
+			csvSafe(r.Class),
+			fmt.Sprintf("%.2f", r.AvgPercentile),
+			pointsField,
+		}
+		for _, bossName := range bossOrder {
+			val := ""
+			if r.BossPercentiles != nil {
+				if p, ok := r.BossPercentiles[bossName]; ok && p != nil {
+					val = fmt.Sprintf("%.1f", *p)
+				}
+			}
+			parts = append(parts, val)
+		}
+		payload.GuildRankRows = append(payload.GuildRankRows, strings.Join(parts, ","))
+	}
+}
+
+// specShortName returns a compact 2-5 char abbreviation for a WoW spec name.
+func specShortName(spec string) string {
+	shorts := map[string]string{
+		"Affliction":    "Aff",
+		"Demonology":    "Demo",
+		"Destruction":   "Des",
+		"Arcane":        "Arc",
+		"Fire":          "Fire",
+		"Frost":         "Frost",
+		"Beast Mastery": "BM",
+		"Marksmanship":  "MM",
+		"Survival":      "Surv",
+		"Holy":          "Holy",
+		"Protection":    "Prot",
+		"Retribution":   "Ret",
+		"Discipline":    "Disc",
+		"Shadow":        "Shad",
+		"Balance":       "Bal",
+		"Feral Combat":  "Fer",
+		"Feral":         "Fer",
+		"Restoration":   "Rest",
+		"Elemental":     "Elem",
+		"Enhancement":   "Enh",
+		"Arms":          "Arms",
+		"Fury":          "Fury",
+		"Assassination": "Ass",
+		"Combat":        "Com",
+		"Subtlety":      "Sub",
+		"Blood":         "Blood",
+		"Unholy":        "Unholy",
+	}
+	if s, ok := shorts[spec]; ok {
+		return s
+	}
+	if len(spec) > 5 {
+		return spec[:5]
+	}
+	return spec
 }
 
 func escapeLuaString(input string) string {
@@ -994,6 +1352,55 @@ func buildRankingsPayloadLua(payload *addonRankingsResponse) string {
 	}
 	sb.WriteString("    },\n")
 
+	if payload.RaidPartyMeta != nil {
+		m := payload.RaidPartyMeta
+		sb.WriteString("    raidPartyMeta = {\n")
+		sb.WriteString(fmt.Sprintf("      raidId = %d,\n", m.RaidID))
+		sb.WriteString(fmt.Sprintf("      raidName = \"%s\",\n", escapeLuaString(m.RaidName)))
+		sb.WriteString(fmt.Sprintf("      difficulty = \"%s\",\n", escapeLuaString(m.Difficulty)))
+		sb.WriteString(fmt.Sprintf("      season = %d,\n", m.Season))
+		sb.WriteString(fmt.Sprintf("      ladder = \"%s\",\n", escapeLuaString(m.Ladder)))
+		sb.WriteString(fmt.Sprintf("      groupType = \"%s\",\n", escapeLuaString(m.GroupType)))
+		sb.WriteString(fmt.Sprintf("      matchedCount = %d,\n", m.MatchedCount))
+		sb.WriteString(fmt.Sprintf("      requestedCount = %d,\n", m.RequestedCount))
+		sb.WriteString(fmt.Sprintf("      sliceSummary = \"%s\",\n", escapeLuaString(m.SliceSummary)))
+		sb.WriteString("    },\n")
+		sb.WriteString("    raidPartyBosses = {\n")
+		for _, b := range payload.RaidPartyBosses {
+			sb.WriteString(fmt.Sprintf("      \"%s\",\n", escapeLuaString(b)))
+		}
+		sb.WriteString("    },\n")
+		sb.WriteString("    raidPartyRows = {\n")
+		for _, row := range payload.RaidPartyRows {
+			sb.WriteString(fmt.Sprintf("      \"%s\",\n", escapeLuaString(row)))
+		}
+		sb.WriteString("    },\n")
+	}
+
+	if payload.GuildRankMeta != nil {
+		m := payload.GuildRankMeta
+		sb.WriteString("    guildRankMeta = {\n")
+		sb.WriteString(fmt.Sprintf("      guildId = %d,\n", m.GuildID))
+		sb.WriteString(fmt.Sprintf("      guildName = \"%s\",\n", escapeLuaString(m.GuildName)))
+		sb.WriteString(fmt.Sprintf("      raidId = %d,\n", m.RaidID))
+		sb.WriteString(fmt.Sprintf("      raidName = \"%s\",\n", escapeLuaString(m.RaidName)))
+		sb.WriteString(fmt.Sprintf("      difficulty = \"%s\",\n", escapeLuaString(m.Difficulty)))
+		sb.WriteString(fmt.Sprintf("      season = %d,\n", m.Season))
+		sb.WriteString(fmt.Sprintf("      ladder = \"%s\",\n", escapeLuaString(m.Ladder)))
+		sb.WriteString(fmt.Sprintf("      sliceSummary = \"%s\",\n", escapeLuaString(m.SliceSummary)))
+		sb.WriteString("    },\n")
+		sb.WriteString("    guildRankBosses = {\n")
+		for _, b := range payload.GuildRankBosses {
+			sb.WriteString(fmt.Sprintf("      \"%s\",\n", escapeLuaString(b)))
+		}
+		sb.WriteString("    },\n")
+		sb.WriteString("    guildRankRows = {\n")
+		for _, row := range payload.GuildRankRows {
+			sb.WriteString(fmt.Sprintf("      \"%s\",\n", escapeLuaString(row)))
+		}
+		sb.WriteString("    },\n")
+	}
+
 	// Emit Dictionary at the end of the payload table.
 	sb.WriteString("    dict = {\n")
 	for i, s := range dictStrings {
@@ -1038,6 +1445,378 @@ func (a *App) fetchJSONGET(pathQuery string) ([]byte, error) {
 		return nil, fmt.Errorf("%s: %s", resp.Status, strings.TrimSpace(string(body)))
 	}
 	return body, nil
+}
+
+func (a *App) fetchJSONPOST(path string, body []byte) ([]byte, error) {
+	base := strings.TrimRight(strings.TrimSpace(a.apiBaseURL), "/")
+	if base == "" {
+		return nil, fmt.Errorf("API base URL is not configured")
+	}
+	urlStr := base + path
+	client := &http.Client{Timeout: 60 * time.Second}
+	req, err := http.NewRequest("POST", urlStr, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%s: %s", resp.Status, strings.TrimSpace(string(respBody)))
+	}
+	return respBody, nil
+}
+
+// FetchRosterCharacterRankingsJSON POSTs addon raid/party export JSON + filter JSON to the rankings API.
+func (a *App) FetchRosterCharacterRankingsJSON(rosterExportJSON string, filtersJSON string) (string, error) {
+	var roster struct {
+		Members []struct {
+			Name  string `json:"name"`
+			Realm string `json:"realm"`
+		} `json:"members"`
+		GroupType string `json:"groupType"`
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(rosterExportJSON)), &roster); err != nil {
+		return "", fmt.Errorf("invalid roster export JSON: %w", err)
+	}
+	if len(roster.Members) == 0 {
+		return "", fmt.Errorf("roster export has no members")
+	}
+
+	var filters map[string]interface{}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(filtersJSON)), &filters); err != nil {
+		return "", fmt.Errorf("invalid filters JSON: %w", err)
+	}
+
+	body := map[string]interface{}{
+		"members": roster.Members,
+	}
+	for k, v := range filters {
+		body[k] = v
+	}
+	if roster.GroupType != "" {
+		body["groupType"] = roster.GroupType
+	}
+
+	raw, err := json.Marshal(body)
+	if err != nil {
+		return "", err
+	}
+	respBody, err := a.fetchJSONPOST("/api/rankings/gp/roster-character-rankings-v2", raw)
+	if err != nil {
+		return "", err
+	}
+	return string(respBody), nil
+}
+
+// CommitRaidPartyRankingsJSON merges roster rankings into the last addon payload and writes RankingsPayload.lua.
+func (a *App) CommitRaidPartyRankingsJSON(apiResponseJSON string, raidName string) (string, error) {
+	var api rosterCharacterRankingsAPIResponse
+	if err := json.Unmarshal([]byte(apiResponseJSON), &api); err != nil {
+		return "", fmt.Errorf("invalid roster rankings response: %w", err)
+	}
+
+	wowDir := strings.TrimSpace(a.config.WowDirectory)
+	if wowDir == "" {
+		return "", fmt.Errorf("wow directory is not configured")
+	}
+	addonDir := filepath.Join(wowDir, "Interface", "AddOns", "WowLogsAddon")
+	srcDir := filepath.Join(addonDir, "src")
+	sidecarPath := filepath.Join(srcDir, rankingsLastCommitJSON)
+
+	var payload addonRankingsResponse
+	if b, err := os.ReadFile(sidecarPath); err == nil && len(b) > 0 {
+		_ = json.Unmarshal(b, &payload)
+	}
+	if payload.Season == 0 {
+		payload.Season = api.Meta.Season
+	}
+
+	applyRosterAPIResponseToPayload(&payload, &api, strings.TrimSpace(raidName))
+
+	merged, err := json.Marshal(&payload)
+	if err != nil {
+		return "", err
+	}
+	msg, err := a.commitAddonRankingsResponseBody(merged)
+	if err != nil {
+		return "", err
+	}
+	return msg + fmt.Sprintf("\n\nRaid/Party slice: %d rows, %d bosses.", len(payload.RaidPartyRows), len(payload.RaidPartyBosses)), nil
+}
+
+type guildInfoResponse struct {
+	ID         int    `json:"id"`
+	Name       string `json:"name"`
+	ServerID   int    `json:"serverId"`
+	ServerName string `json:"serverName"`
+}
+
+type guildCharRankRowAPI struct {
+	PlayerName      string              `json:"playerName"`
+	Class           string              `json:"class"`
+	AvgPercentile   float64             `json:"avgPercentile"`
+	AllStarPoints   float64             `json:"allStarPoints"`
+	SpecPoints      []struct {
+		Spec   string  `json:"spec"`
+		Points float64 `json:"points"`
+	} `json:"specPoints"`
+	BossPercentiles map[string]*float64 `json:"bossPercentiles"`
+}
+
+// parseGuildCharacterRankingsJSON decodes the V2 guild rankings array (flexible boss percentile values).
+func parseGuildCharacterRankingsJSON(body []byte) ([]guildCharRankRowAPI, error) {
+	var raw []map[string]json.RawMessage
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, err
+	}
+	out := make([]guildCharRankRowAPI, 0, len(raw))
+	for _, row := range raw {
+		var r guildCharRankRowAPI
+		if v, ok := row["playerName"]; ok {
+			_ = json.Unmarshal(v, &r.PlayerName)
+		}
+		if v, ok := row["class"]; ok {
+			_ = json.Unmarshal(v, &r.Class)
+		}
+		if v, ok := row["avgPercentile"]; ok {
+			_ = json.Unmarshal(v, &r.AvgPercentile)
+		}
+		if v, ok := row["allStarPoints"]; ok {
+			_ = json.Unmarshal(v, &r.AllStarPoints)
+		}
+		if v, ok := row["specPoints"]; ok {
+			_ = json.Unmarshal(v, &r.SpecPoints)
+		}
+		if v, ok := row["bossPercentiles"]; ok {
+			var bp map[string]json.RawMessage
+			if err := json.Unmarshal(v, &bp); err == nil {
+				r.BossPercentiles = make(map[string]*float64, len(bp))
+				for boss, pctRaw := range bp {
+					if string(pctRaw) == "null" {
+						r.BossPercentiles[boss] = nil
+						continue
+					}
+					var pct float64
+					if err := json.Unmarshal(pctRaw, &pct); err == nil {
+						r.BossPercentiles[boss] = &pct
+					}
+				}
+			}
+		}
+		out = append(out, r)
+	}
+	return out, nil
+}
+
+func bossOrderFromRankings(rankings []guildCharRankRowAPI, bossesFilterJSON string) []string {
+	present := make(map[string]bool)
+	for _, r := range rankings {
+		for name := range r.BossPercentiles {
+			if name != "" {
+				present[name] = true
+			}
+		}
+	}
+	var ordered []string
+	var filterRows []struct {
+		Label string `json:"label"`
+	}
+	if err := json.Unmarshal([]byte(bossesFilterJSON), &filterRows); err == nil {
+		for _, row := range filterRows {
+			if present[row.Label] {
+				ordered = append(ordered, row.Label)
+				delete(present, row.Label)
+			}
+		}
+	}
+	extras := make([]string, 0, len(present))
+	for name := range present {
+		extras = append(extras, name)
+	}
+	sort.Strings(extras)
+	return append(ordered, extras...)
+}
+
+// FetchGuildInfoJSON returns minimal guild metadata for filter loading (GET /api/guilds/:id).
+func (a *App) FetchGuildInfoJSON(guildID int) (string, error) {
+	if guildID <= 0 {
+		return "", fmt.Errorf("guildId must be a positive number")
+	}
+	body, err := a.fetchJSONGET(fmt.Sprintf("/api/guilds/%d", guildID))
+	if err != nil {
+		return "", err
+	}
+	var raw struct {
+		ID         int    `json:"id"`
+		Name       string `json:"name"`
+		ServerID   int    `json:"serverId"`
+		ServerName string `json:"serverName"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return "", fmt.Errorf("invalid guild response: %w", err)
+	}
+	out := guildInfoResponse{
+		ID:         raw.ID,
+		Name:       raw.Name,
+		ServerID:   raw.ServerID,
+		ServerName: raw.ServerName,
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+// FetchGuildCharacterRankingsJSON loads guild character rankings V2 and returns {rankings,bossOrder,meta}.
+func (a *App) FetchGuildCharacterRankingsJSON(guildID int, filtersJSON string) (string, error) {
+	if guildID <= 0 {
+		return "", fmt.Errorf("guildId must be a positive number")
+	}
+	var filters map[string]interface{}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(filtersJSON)), &filters); err != nil {
+		return "", fmt.Errorf("invalid filters JSON: %w", err)
+	}
+	raidID, _ := filters["raidId"].(float64)
+	difficulty, _ := filters["difficulty"].(string)
+	seasonF, _ := filters["season"].(float64)
+	ladder, _ := filters["ladder"].(string)
+	serverIDF, _ := filters["serverId"].(float64)
+	guildName, _ := filters["guildName"].(string)
+	if int(raidID) <= 0 {
+		return "", fmt.Errorf("raidId is required in filters")
+	}
+	difficulty = strings.TrimSpace(difficulty)
+	if difficulty == "" {
+		return "", fmt.Errorf("difficulty is required in filters")
+	}
+	ladder = strings.ToUpper(strings.TrimSpace(ladder))
+	if ladder == "" {
+		ladder = "REGULAR"
+	}
+	season := int(seasonF)
+	if season <= 0 {
+		season = 1
+	}
+	serverID := int(serverIDF)
+
+	q := url.Values{}
+	q.Set("guildId", strconv.Itoa(guildID))
+	q.Set("raidId", strconv.Itoa(int(raidID)))
+	q.Set("difficulty", difficulty)
+	q.Set("season", strconv.Itoa(season))
+	q.Set("ladder", ladder)
+
+	rankBody, err := a.fetchJSONGET("/api/rankings/gp/character-rankings-v2?" + q.Encode())
+	if err != nil {
+		return "", err
+	}
+	// Pass rankings through unchanged so numeric fields are not lost on re-encode.
+	if len(rankBody) == 0 || rankBody[0] != '[' {
+		return "", fmt.Errorf("invalid guild rankings response: expected JSON array, got: %.200s", string(rankBody))
+	}
+
+	var rankingsForOrder []guildCharRankRowAPI
+	if err := json.Unmarshal(rankBody, &rankingsForOrder); err != nil {
+		rankingsForOrder, err = parseGuildCharacterRankingsJSON(rankBody)
+		if err != nil {
+			return "", fmt.Errorf("invalid guild rankings response: %w", err)
+		}
+	}
+
+	bossDiff := difficulty
+	if strings.EqualFold(bossDiff, "OVERALL") {
+		bossDiff = "TWENTY_FIVE_HC"
+	}
+	bossesJSON := "[]"
+	if serverID > 0 {
+		bossesJSON, err = a.FetchLeaderboardFilterBossesJSON(serverID, int(raidID), bossDiff, season)
+		if err != nil {
+			bossesJSON = "[]"
+		}
+	}
+	bossOrder := bossOrderFromRankings(rankingsForOrder, bossesJSON)
+
+	type guildRankingsPayload struct {
+		Rankings  json.RawMessage `json:"rankings"`
+		BossOrder []string        `json:"bossOrder"`
+		Meta      struct {
+			GuildID    int    `json:"guildId"`
+			GuildName  string `json:"guildName"`
+			ServerID   int    `json:"serverId"`
+			RaidID     int    `json:"raidId"`
+			Difficulty string `json:"difficulty"`
+			Season     int    `json:"season"`
+			Ladder     string `json:"ladder"`
+		} `json:"meta"`
+	}
+	payload := guildRankingsPayload{
+		Rankings:  json.RawMessage(rankBody),
+		BossOrder: bossOrder,
+	}
+	payload.Meta.GuildID = guildID
+	payload.Meta.GuildName = guildName
+	payload.Meta.ServerID = serverID
+	payload.Meta.RaidID = int(raidID)
+	payload.Meta.Difficulty = difficulty
+	payload.Meta.Season = season
+	payload.Meta.Ladder = ladder
+
+	out, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// CommitGuildRankingsJSON merges guild rankings into RankingsPayload.lua.
+func (a *App) CommitGuildRankingsJSON(apiResponseJSON string, guildName string, raidName string) (string, error) {
+	var api guildCharacterRankingsAPIResponse
+	if err := json.Unmarshal([]byte(apiResponseJSON), &api); err != nil {
+		return "", fmt.Errorf("invalid guild rankings response: %w", err)
+	}
+
+	wowDir := strings.TrimSpace(a.config.WowDirectory)
+	if wowDir == "" {
+		return "", fmt.Errorf("wow directory is not configured")
+	}
+	addonDir := filepath.Join(wowDir, "Interface", "AddOns", "WowLogsAddon")
+	srcDir := filepath.Join(addonDir, "src")
+	sidecarPath := filepath.Join(srcDir, rankingsLastCommitJSON)
+
+	var payload addonRankingsResponse
+	if b, err := os.ReadFile(sidecarPath); err == nil && len(b) > 0 {
+		_ = json.Unmarshal(b, &payload)
+	}
+	if payload.Season == 0 {
+		payload.Season = api.Meta.Season
+	}
+	if strings.TrimSpace(guildName) == "" {
+		guildName = api.Meta.GuildName
+	}
+	if strings.TrimSpace(raidName) == "" {
+		raidName = fmt.Sprintf("Raid #%d", api.Meta.RaidID)
+	}
+
+	applyGuildRankingsToPayload(&payload, &api, strings.TrimSpace(guildName), strings.TrimSpace(raidName))
+
+	merged, err := json.Marshal(&payload)
+	if err != nil {
+		return "", err
+	}
+	msg, err := a.commitAddonRankingsResponseBody(merged)
+	if err != nil {
+		return "", err
+	}
+	return msg + fmt.Sprintf("\n\nGuild slice: %d rows, %d bosses.", len(payload.GuildRankRows), len(payload.GuildRankBosses)), nil
 }
 
 // FetchLeaderboardFilterRaidsJSON returns JSON array of {label,value} for /api/rankings/filters/raids.

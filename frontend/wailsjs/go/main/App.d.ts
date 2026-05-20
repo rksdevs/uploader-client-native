@@ -6,7 +6,15 @@ export function BrowseAddonRankingsJSON(arg1:string,arg2:number,arg3:string):Pro
 
 export function CommitAddonRankingsJSON(arg1:string):Promise<string>;
 
+export function CommitGuildRankingsJSON(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function CommitRaidPartyRankingsJSON(arg1:string,arg2:string):Promise<string>;
+
 export function EnqueueJobs(arg1:number,arg2:Array<main.Instance>):Promise<string>;
+
+export function FetchGuildCharacterRankingsJSON(arg1:number,arg2:string):Promise<string>;
+
+export function FetchGuildInfoJSON(arg1:number):Promise<string>;
 
 export function FetchLeaderboardFilterBossesJSON(arg1:number,arg2:number,arg3:string,arg4:number):Promise<string>;
 
@@ -16,7 +24,11 @@ export function FetchLeaderboardFilterRaidsJSON(arg1:number,arg2:number):Promise
 
 export function FetchLeaderboardSeasonsConfigJSON():Promise<string>;
 
+export function FetchRosterCharacterRankingsJSON(arg1:string,arg2:string):Promise<string>;
+
 export function GetApiBaseURL():Promise<string>;
+
+export function GetAppVersion():Promise<string>;
 
 export function GetPremiumConfig():Promise<Record<string, string>>;
 

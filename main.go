@@ -20,14 +20,15 @@ func main() {
 		Height:           800,
 		MinWidth:         720,
 		MinHeight:        560,
-		// Maximised (not Fullscreen): keeps title bar, min/max/close, resize, and taskbar visible.
-		WindowStartState: options.Maximised,
+		// Normal at launch; startup applies saved geometry or maximises on first run.
+		WindowStartState: options.Normal,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
 		// Slate-900 — matches redesigned shell while WebView loads
 		BackgroundColour: &options.RGBA{R: 15, G: 23, B: 42, A: 1},
 		OnStartup:        app.startup,
+		OnShutdown:       app.Shutdown,
 		Bind: []interface{}{
 			app,
 		},

@@ -1332,6 +1332,121 @@ h1 {
   align-items: start;
 }
 
+/* Guild rankings — hint + guild ID row */
+.rankings-browser__guild-hint {
+  margin: 0 0 0.65rem;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  background: var(--bg-subtle, #f1f5f9);
+  border: 1px solid var(--border-soft);
+  border-radius: 0.5rem;
+}
+
+.dark-theme .rankings-browser__guild-hint {
+  background: rgba(30, 41, 59, 0.55);
+}
+
+.rankings-browser__guild-hint-example {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+  color: var(--text-primary);
+}
+
+.rankings-browser__guild-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 0.55rem;
+}
+
+.rankings-browser__guild-id-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.rankings-browser__guild-id-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.rankings-browser__guild-id-input-row .rb-field__control {
+  width: 5.25rem;
+  min-width: 5.25rem;
+  flex: 0 0 auto;
+}
+
+.rankings-browser__load-guild-btn {
+  flex-shrink: 0;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.rankings-browser__guild-loaded {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.45rem 0.6rem;
+  background: var(--bg-subtle, #f1f5f9);
+  border: 1px solid var(--border-soft);
+  border-radius: 0.5rem;
+}
+
+.dark-theme .rankings-browser__guild-loaded {
+  background: rgba(30, 41, 59, 0.45);
+}
+
+.rankings-browser__guild-detail {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.rankings-browser__guild-detail strong {
+  font-weight: 700;
+}
+
+.rankings-browser__guild-detail-sep {
+  color: var(--text-muted);
+}
+
+.rankings-browser__guild-detail-meta {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+/* Compact ranking selects — chevron (WebView2 often hides native arrow) */
+.rankings-browser--compact .rb-select-wrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.rankings-browser--compact .rb-select-wrap select {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 1.55rem;
+}
+
+.rankings-browser--compact .rb-select-wrap__chevron {
+  position: absolute;
+  right: 0.42rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-muted);
+}
+
 .rankings-browser--compact .rb-field__label {
   font-size: 0.7rem;
   line-height: 1.2;
@@ -1581,4 +1696,29 @@ h1 {
 
 .dark-theme .rankings-browser__table-wrap tbody tr:hover {
   background: rgba(255, 255, 255, 0.04);
+}
+
+/* ── Roster Rankings boss table ── */
+.rr-boss-table th,
+.rr-boss-table td {
+  border-right: 1px solid var(--border-soft);
+}
+.rr-boss-table th:last-child,
+.rr-boss-table td:last-child {
+  border-right: none;
+}
+
+.rr-boss-table .rr-col-num {
+  width: 3.8rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.rr-boss-table .rr-col-boss {
+  width: 3rem;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 3rem;
 }

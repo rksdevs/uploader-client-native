@@ -25,6 +25,7 @@ import {
   SavePremiumConfig,
   GetTheme,
   SetTheme,
+  GetAppVersion,
 } from "../wailsjs/go/main/App";
 import { main } from "../wailsjs/go/models";
 import { EventsOn, BrowserOpenURL } from "../wailsjs/runtime";
@@ -37,6 +38,8 @@ import InstanceSelector from "./components/InstanceSelector";
 import ConfirmationModal from "./components/ConfirmationModal";
 import AddonPathHelpModal from "./components/AddonPathHelpModal";
 import RankingsBrowser from "./components/RankingsBrowser";
+import RosterRankingsBrowser from "./components/RosterRankingsBrowser";
+import GuildRankingsBrowser from "./components/GuildRankingsBrowser";
 import { Instance, JobNotification } from "./types";
 
 function App() {
@@ -61,6 +64,7 @@ function App() {
   const [showClearConfirm, setShowClearConfirm] = useState<boolean>(false);
   const [showAddonHelp, setShowAddonHelp] = useState<boolean>(false);
   const [theme, setTheme] = useState<string>("light");
+  const [appVersion, setAppVersion] = useState<string>("3.1.0");
 
   const loadServers = useCallback((silent?: boolean) => {
     GetUploaderServers()
@@ -88,6 +92,11 @@ function App() {
   }, []);
 
   useEffect(() => {
+    GetAppVersion()
+      .then((v: string) => {
+        if (v?.trim()) setAppVersion(v.trim());
+      })
+      .catch(() => {});
     GetSavedDirectory()
       .then((savedPath: string) => {
         if (savedPath) {
@@ -347,7 +356,7 @@ function App() {
                 <BarChart3 size={28} strokeWidth={2} />
               </div>
               <div>
-                <h1 className="app-title">WoW Logs Uploader</h1>
+                <h1 className="app-title">WoW Logs Uploader - V {appVersion}</h1>
                 <p className="app-subtitle">Combat log analysis made easy</p>
               </div>
             </div>
@@ -586,6 +595,19 @@ function App() {
               <RankingsBrowser
                 selectedServer={selectedServer}
                 serverNumericId={selectedServerNumericId}
+                wowDirectory={wowDirectory}
+                disabled={isProcessing}
+                theme={theme === "dark" ? "dark" : "light"}
+              />
+
+              <RosterRankingsBrowser
+                serverNumericId={selectedServerNumericId}
+                wowDirectory={wowDirectory}
+                disabled={isProcessing}
+                theme={theme === "dark" ? "dark" : "light"}
+              />
+
+              <GuildRankingsBrowser
                 wowDirectory={wowDirectory}
                 disabled={isProcessing}
                 theme={theme === "dark" ? "dark" : "light"}

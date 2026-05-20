@@ -10,8 +10,24 @@ export function CommitAddonRankingsJSON(arg1) {
   return window['go']['main']['App']['CommitAddonRankingsJSON'](arg1);
 }
 
+export function CommitGuildRankingsJSON(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CommitGuildRankingsJSON'](arg1, arg2, arg3);
+}
+
+export function CommitRaidPartyRankingsJSON(arg1, arg2) {
+  return window['go']['main']['App']['CommitRaidPartyRankingsJSON'](arg1, arg2);
+}
+
 export function EnqueueJobs(arg1, arg2) {
   return window['go']['main']['App']['EnqueueJobs'](arg1, arg2);
+}
+
+export function FetchGuildCharacterRankingsJSON(arg1, arg2) {
+  return window['go']['main']['App']['FetchGuildCharacterRankingsJSON'](arg1, arg2);
+}
+
+export function FetchGuildInfoJSON(arg1) {
+  return window['go']['main']['App']['FetchGuildInfoJSON'](arg1);
 }
 
 export function FetchLeaderboardFilterBossesJSON(arg1, arg2, arg3, arg4) {
@@ -30,8 +46,16 @@ export function FetchLeaderboardSeasonsConfigJSON() {
   return window['go']['main']['App']['FetchLeaderboardSeasonsConfigJSON']();
 }
 
+export function FetchRosterCharacterRankingsJSON(arg1, arg2) {
+  return window['go']['main']['App']['FetchRosterCharacterRankingsJSON'](arg1, arg2);
+}
+
 export function GetApiBaseURL() {
   return window['go']['main']['App']['GetApiBaseURL']();
+}
+
+export function GetAppVersion() {
+  return window['go']['main']['App']['GetAppVersion']();
 }
 
 export function GetPremiumConfig() {
