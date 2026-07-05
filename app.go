@@ -23,7 +23,7 @@ import (
 )
 
 // AppVersion is shown in the uploader header (keep in sync with wails.json info.version).
-const AppVersion = "3.2.0"
+const AppVersion = "3.2.1"
 
 // nativeUploaderClientHeader identifies server-side API calls from the desktop app.
 const nativeUploaderClientHeader = "X-Wow-Logs-Native-Uploader"
@@ -71,6 +71,8 @@ type App struct {
 	autoUploadWatcher *autoUploadWatcherRuntime
 	autoUploadDriftMu sync.Mutex
 	autoUploadDriftPending *autoUploadDriftWaiter
+	appQuitMu    sync.Mutex
+	appQuitting  bool
 }
 
 func fallbackUploaderServers() []UploaderServer {
@@ -317,6 +319,27 @@ func (a *App) saveWindowState() {
 	defer a.windowGeoMu.Unlock()
 	if err := a.saveConfig(); err != nil {
 		log.Printf("[Go Backend] Could not save window state: %v\n", err)
+	}
+}
+
+func (a *App) isAppQuitting() bool {
+	a.appQuitMu.Lock()
+	defer a.appQuitMu.Unlock()
+	return a.appQuitting
+}
+
+// requestAppQuit performs a full application exit (tray Quit, etc.).
+func (a *App) requestAppQuit() {
+	a.appQuitMu.Lock()
+	a.appQuitting = true
+	a.appQuitMu.Unlock()
+
+	_ = a.resolveAutoUploadDrift("", false)
+	a.stopAutoUploadWatcher()
+	a.stopWindowGeometryWatcher()
+	a.saveWindowState()
+	if a.ctx != nil {
+		runtime.Quit(a.ctx)
 	}
 }
 

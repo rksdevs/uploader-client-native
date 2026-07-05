@@ -125,13 +125,7 @@ func (a *App) showMainWindow() {
 }
 
 func (a *App) quitFromTray() {
-	a.stopAutoUploadWatcher()
-	a.stopWindowGeometryWatcher()
-	a.saveWindowState()
-	systray.Quit()
-	if a.ctx != nil {
-		runtime.Quit(a.ctx)
-	}
+	a.requestAppQuit()
 }
 
 func (a *App) shutdownSystemTray() {
@@ -202,7 +196,7 @@ func trayStatusLabel(status AutoUploadWatcherStatus) string {
 }
 
 func (a *App) onBeforeClose(ctx context.Context) bool {
-	if !a.minimizeToTrayEnabled() {
+	if a.isAppQuitting() || !a.minimizeToTrayEnabled() {
 		return false
 	}
 	runtime.WindowHide(ctx)
