@@ -18,6 +18,17 @@ import {
   toSlug,
 } from "../lib/leaderboardVisuals";
 
+/** Max rows per addon rankings pull (server clamps to the same cap). */
+const ADDON_ROWS_MAX = 1000;
+/** Show performance/size disclaimer above this row count. */
+const ADDON_ROWS_WARN = 500;
+
+function effectiveBucketCap(raw: string): number | undefined {
+  const cap = parseInt(raw, 10);
+  if (Number.isNaN(cap) || cap <= 0) return undefined;
+  return Math.min(ADDON_ROWS_MAX, cap);
+}
+
 type ExportMeta = {
   syncMode?: string;
   serverId?: number;
@@ -612,8 +623,8 @@ const RankingsBrowser: React.FC<RankingsBrowserProps> = ({
       if (pointsRoleFilter === "DPS" || pointsRoleFilter === "HEAL") {
         o.pointsRole = pointsRoleFilter;
       }
-      const cap = parseInt(bucketCap, 10);
-      if (!Number.isNaN(cap) && cap > 0) o.bucketCap = cap;
+      const cap = effectiveBucketCap(bucketCap);
+      if (cap != null) o.bucketCap = cap;
       return JSON.stringify(o);
     }
     if (selectedBossId == null || !difficulty) {
@@ -632,8 +643,8 @@ const RankingsBrowser: React.FC<RankingsBrowserProps> = ({
     if (c && c !== "All") o.class = c;
     const s = spec.trim();
     if (s && s !== "All") o.spec = s;
-    const cap = parseInt(bucketCap, 10);
-    if (!Number.isNaN(cap) && cap > 0) o.bucketCap = cap;
+    const cap = effectiveBucketCap(bucketCap);
+    if (cap != null) o.bucketCap = cap;
     return JSON.stringify(o);
   }, [
     leaderboardSync,
@@ -737,6 +748,10 @@ const RankingsBrowser: React.FC<RankingsBrowserProps> = ({
     leaderboardSync === "points_v2"
       ? serverOk && !!pointsLadder.trim() && !!pointsDifficulty.trim()
       : selectedRaidId != null && !!difficulty && selectedBossId != null && bosses.length > 0;
+
+  const bucketCapNum = parseInt(bucketCap, 10);
+  const showRowsDisclaimer =
+    !Number.isNaN(bucketCapNum) && bucketCapNum > ADDON_ROWS_WARN;
 
   return (
     <section
@@ -989,7 +1004,7 @@ const RankingsBrowser: React.FC<RankingsBrowserProps> = ({
                 value={bucketCap}
                 onChange={(e) => setBucketCap(e.target.value.replace(/[^\d]/g, ""))}
                 placeholder="50"
-                title="How many leaderboard rows to fetch per bucket (1–500; server clamps). Same cap trims points and performance in the addon export."
+                title={`How many leaderboard rows to fetch per bucket (1–${ADDON_ROWS_MAX}; server clamps). Same cap trims points and performance in the addon export.`}
                 disabled={disabled || loading}
               />
             </label>
@@ -1121,13 +1136,20 @@ const RankingsBrowser: React.FC<RankingsBrowserProps> = ({
                 value={bucketCap}
                 onChange={(e) => setBucketCap(e.target.value.replace(/[^\d]/g, ""))}
                 placeholder="50"
-                title="Max rows in this slice (1–500; server clamps). Followed players from Premium settings are kept first."
+                title={`Max rows in this slice (1–${ADDON_ROWS_MAX}; server clamps). Followed players from Premium settings are kept first.`}
                 disabled={disabled || loading}
               />
             </label>
           </>
         )}
           </div>
+
+          {showRowsDisclaimer ? (
+            <p className="rankings-browser__note rankings-browser__rows-warn" role="note">
+              More than {ADDON_ROWS_WARN} rows increases the addon data file size and may slow
+              WoW load times or in-game addon performance. Maximum {ADDON_ROWS_MAX} rows per pull.
+            </p>
+          ) : null}
         </>
       ) : null}
 

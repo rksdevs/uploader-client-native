@@ -13,8 +13,12 @@ import {
 import {
   PreprocessLog,
   EnqueueJobs,
+  EnqueueAutoUploadJobs,
+  AbandonAutoUploadInstanceSelection,
+  ResolveAutoUploadServerDrift,
+  CancelAutoUploadServerDrift,
   SelectDirectory,
-  StartMonitoringJob,
+  StartMonitoringJobWithTailRefresh,
   GetSavedDirectory,
   GetUploaderServers,
   OpenAllLogsPage,
@@ -26,6 +30,7 @@ import {
   GetTheme,
   SetTheme,
   GetAppVersion,
+  GetAutoUploadSettings,
 } from "../wailsjs/go/main/App";
 import { main } from "../wailsjs/go/models";
 import { EventsOn, BrowserOpenURL } from "../wailsjs/runtime";
@@ -40,6 +45,10 @@ import AddonPathHelpModal from "./components/AddonPathHelpModal";
 import RankingsBrowser from "./components/RankingsBrowser";
 import RosterRankingsBrowser from "./components/RosterRankingsBrowser";
 import GuildRankingsBrowser from "./components/GuildRankingsBrowser";
+import AutoUploadSettings from "./components/AutoUploadSettings";
+import ServerDriftModal, {
+  ServerDriftState,
+} from "./components/ServerDriftModal";
 import { Instance, JobNotification } from "./types";
 
 function App() {
@@ -54,6 +63,10 @@ function App() {
   const [instances, setInstances] = useState<Instance[]>([]);
   const [hasMultipleDetectedServers, setHasMultipleDetectedServers] =
     useState<boolean>(false);
+  const [isAutoUploadInstanceFlow, setIsAutoUploadInstanceFlow] =
+    useState<boolean>(false);
+  const [autoUploadStagingPath, setAutoUploadStagingPath] = useState<string>("");
+  const [autoUploadSourceLogPath, setAutoUploadSourceLogPath] = useState<string>("");
   const [serverOptions, setServerOptions] = useState<ServerOption[]>([]);
   const [wowDirectory, setWowDirectory] = useState<string>("");
   const [showPremiumSettings, setShowPremiumSettings] = useState<boolean>(false);
@@ -64,7 +77,9 @@ function App() {
   const [showClearConfirm, setShowClearConfirm] = useState<boolean>(false);
   const [showAddonHelp, setShowAddonHelp] = useState<boolean>(false);
   const [theme, setTheme] = useState<string>("light");
-  const [appVersion, setAppVersion] = useState<string>("3.1.0");
+  const [appVersion, setAppVersion] = useState<string>("3.2.0");
+  const [serverDrift, setServerDrift] = useState<ServerDriftState | null>(null);
+  const [isResolvingDrift, setIsResolvingDrift] = useState(false);
 
   const loadServers = useCallback((silent?: boolean) => {
     GetUploaderServers()
@@ -135,6 +150,16 @@ function App() {
         console.error("[React App] Error loading premium config:", err);
       });
 
+    GetAutoUploadSettings()
+      .then((autoCfg: { defaultServer?: string }) => {
+        if (autoCfg?.defaultServer) {
+          setSelectedServer((prev) => prev || autoCfg.defaultServer || "");
+        }
+      })
+      .catch((err: unknown) => {
+        console.error("[React App] Error loading auto-upload settings:", err);
+      });
+
     GetTheme()
       .then((savedTheme: string) => {
         if (savedTheme) setTheme(savedTheme);
@@ -168,6 +193,95 @@ function App() {
       cleanup();
     };
   }, []);
+
+  useEffect(() => {
+    const cleanup = EventsOn(
+      "auto_upload_instances_ready",
+      (data: {
+        preprocessId?: number;
+        instances?: Instance[];
+        hasMultipleDetectedServers?: boolean;
+        defaultServer?: string;
+        stagingPath?: string;
+        sourceLogPath?: string;
+      }) => {
+        if (!data?.preprocessId || !data.instances?.length) {
+          return;
+        }
+        setPreprocessId(data.preprocessId);
+        setInstances(data.instances);
+        setHasMultipleDetectedServers(!!data.hasMultipleDetectedServers);
+        setIsAutoUploadInstanceFlow(true);
+        setAutoUploadStagingPath(data.stagingPath || "");
+        setAutoUploadSourceLogPath(data.sourceLogPath || "");
+        if (data.defaultServer) {
+          setSelectedServer(data.defaultServer);
+        }
+        setView("select");
+        setStatusMessage("Auto-upload: choose raid instances to process.");
+        toast.info("Multiple raid instances detected", {
+          description: "Select which instances to upload automatically.",
+          duration: 12000,
+        });
+      }
+    );
+    return () => cleanup();
+  }, []);
+
+  useEffect(() => {
+    const cleanup = EventsOn(
+      "auto_upload_server_drift",
+      (data: ServerDriftState) => {
+        if (!data?.defaultServer || !data.detectedServers?.length) {
+          return;
+        }
+        setServerDrift(data);
+        setStatusMessage("Auto-upload: confirm server for new combat log lines.");
+        toast.warning("Server drift detected", {
+          description:
+            "New log lines look like a different Warmane realm than your default.",
+          duration: 15000,
+        });
+      }
+    );
+    return () => cleanup();
+  }, []);
+
+  useEffect(() => {
+    const cleanup = EventsOn("auto_upload_drift_cancelled", () => {
+      setServerDrift(null);
+      setIsResolvingDrift(false);
+    });
+    return () => cleanup();
+  }, []);
+
+  const resolveServerDrift = (serverName: string) => {
+    setIsResolvingDrift(true);
+    ResolveAutoUploadServerDrift(serverName)
+      .then(() => {
+        setServerDrift(null);
+        setStatusMessage(`Auto-upload continuing with selected server…`);
+      })
+      .catch((err: unknown) => {
+        toast.error("Could not continue auto-upload", {
+          description: String(err),
+        });
+      })
+      .finally(() => setIsResolvingDrift(false));
+  };
+
+  const cancelServerDrift = () => {
+    setIsResolvingDrift(true);
+    CancelAutoUploadServerDrift()
+      .then(() => {
+        setServerDrift(null);
+        setStatusMessage("Auto-upload paused — server confirmation cancelled.");
+      })
+      .catch((err: unknown) => {
+        toast.error("Could not cancel drift prompt", { description: String(err) });
+      })
+      .finally(() => setIsResolvingDrift(false));
+  };
 
   const handleSelectDirectory = () => {
     SelectDirectory()
@@ -256,7 +370,7 @@ function App() {
       .then((response) => {
         if (response.autoQueued) {
           toast.success(response.message);
-          StartMonitoringJob(response.preprocessId);
+          StartMonitoringJobWithTailRefresh(response.preprocessId, logDirectory);
           resetToUploadView();
         } else {
           setInstances(response.instances);
@@ -286,10 +400,23 @@ function App() {
       (inst) => new main.Instance(inst)
     );
 
-    EnqueueJobs(preprocessId, instancesForGo)
+    const queuePromise = isAutoUploadInstanceFlow
+      ? EnqueueAutoUploadJobs(
+          preprocessId,
+          instancesForGo,
+          autoUploadSourceLogPath,
+          autoUploadStagingPath
+        )
+      : EnqueueJobs(preprocessId, instancesForGo);
+
+    queuePromise
       .then((result) => {
         toast.success(result);
-        StartMonitoringJob(preprocessId);
+        if (isAutoUploadInstanceFlow) {
+          setStatusMessage("Auto-upload jobs queued — processing in background.");
+        } else {
+          StartMonitoringJobWithTailRefresh(preprocessId, logDirectory);
+        }
         resetToUploadView();
       })
       .catch((err) => {
@@ -325,11 +452,19 @@ function App() {
     return statusMessage;
   }, [statusMessage, logDirectory]);
 
-  const resetToUploadView = () => {
+  const resetToUploadView = (options?: { abandonAutoUpload?: boolean }) => {
+    if (options?.abandonAutoUpload && isAutoUploadInstanceFlow) {
+      AbandonAutoUploadInstanceSelection().catch((err: unknown) => {
+        console.error("[AutoUpload] abandon instance selection:", err);
+      });
+    }
     setView("upload");
     setInstances([]);
     setPreprocessId(null);
     setHasMultipleDetectedServers(false);
+    setIsAutoUploadInstanceFlow(false);
+    setAutoUploadStagingPath("");
+    setAutoUploadSourceLogPath("");
     if (logDirectory) {
       setStatusMessage(`Monitoring logs in: ${logDirectory}`);
     } else {
@@ -575,6 +710,14 @@ function App() {
                 </div>
               ) : null}
 
+              <AutoUploadSettings
+                serverOptions={serverOptions}
+                disabled={isProcessing}
+                apiToken={apiToken}
+                logDirectory={logDirectory}
+                onOpenPremiumSettings={() => setShowPremiumSettings(true)}
+              />
+
               <div className="action-grid-2">
                 <UploadButton
                   onUpload={handlePreprocess}
@@ -615,10 +758,15 @@ function App() {
             </>
           ) : (
             <div className="redesign-card instance-flow-card">
+              {isAutoUploadInstanceFlow ? (
+                <p className="auto-upload-instance-banner" role="status">
+                  Automatic upload — select raid instances to process.
+                </p>
+              ) : null}
               <InstanceSelector
                 instances={instances}
                 onProcess={handleEnqueue}
-                onCancel={resetToUploadView}
+                onCancel={() => resetToUploadView({ abandonAutoUpload: true })}
                 isProcessing={isProcessing}
                 selectedServer={selectedServer}
                 serverOptions={serverOptions}
@@ -656,6 +804,19 @@ function App() {
       <AddonPathHelpModal
         isOpen={showAddonHelp}
         onClose={() => setShowAddonHelp(false)}
+      />
+
+      <ServerDriftModal
+        isOpen={serverDrift !== null}
+        drift={serverDrift}
+        serverOptions={serverOptions}
+        isResolving={isResolvingDrift}
+        onUseDetected={(serverName) => resolveServerDrift(serverName)}
+        onKeepDefault={() =>
+          serverDrift && resolveServerDrift(serverDrift.defaultServer)
+        }
+        onUseSelected={(serverName) => resolveServerDrift(serverName)}
+        onCancel={cancelServerDrift}
       />
     </div>
   );

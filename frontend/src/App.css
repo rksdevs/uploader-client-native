@@ -1033,6 +1033,232 @@ h1 {
   margin-top: -0.25rem;
 }
 
+.auto-upload-card {
+  margin-top: 0.75rem;
+}
+
+.auto-upload-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.auto-upload-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  flex: 1;
+}
+
+.auto-upload-desc {
+  font-size: 0.875rem;
+  color: var(--text-muted, #64748b);
+  margin: 0 0 1rem;
+  line-height: 1.45;
+}
+
+.auto-upload-warning {
+  font-size: 0.8rem;
+  margin: 0.5rem 0 0;
+  color: #b45309;
+}
+
+.dark-theme .auto-upload-warning {
+  color: #fbbf24;
+}
+
+.auto-upload-prereq {
+  margin-top: 0.5rem;
+}
+
+.auto-upload-prereq-btn {
+  margin-top: 0.5rem;
+  width: 100%;
+}
+
+.auto-upload-watcher-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--redesign-card-border, #cbd5e1);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.auto-upload-watcher-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #64748b);
+}
+
+.auto-upload-watcher-value {
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.auto-upload-watcher-detail {
+  font-size: 0.75rem;
+  color: var(--text-muted, #64748b);
+}
+
+.auto-upload-activity {
+  margin: 0 0 1rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--redesign-card-border, #cbd5e1);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.dark-theme .auto-upload-activity {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.auto-upload-activity-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.auto-upload-activity-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #64748b);
+}
+
+.auto-upload-activity-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.15);
+  color: var(--text-muted, #64748b);
+}
+
+.auto-upload-activity-badge--changed {
+  background: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+}
+
+.dark-theme .auto-upload-activity-badge--changed {
+  color: #4ade80;
+}
+
+.auto-upload-activity-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 1rem;
+  margin: 0;
+}
+
+.auto-upload-activity-grid dt {
+  font-size: 0.7rem;
+  color: var(--text-muted, #64748b);
+  margin: 0;
+}
+
+.auto-upload-activity-grid dd {
+  font-size: 0.8rem;
+  margin: 0.1rem 0 0;
+}
+
+.auto-upload-activity-latest {
+  margin: 0.65rem 0 0;
+  font-size: 0.75rem;
+}
+
+.auto-upload-activity-latest code {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+.auto-upload-baseline {
+  margin: 1rem 0;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--redesign-card-border, #cbd5e1);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.dark-theme .auto-upload-baseline {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.auto-upload-baseline-label {
+  font-size: 0.8rem;
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.auto-upload-baseline-lines {
+  font-size: 0.7rem;
+  line-height: 1.35;
+  max-height: 8rem;
+  overflow: auto;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.auto-upload-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.auto-upload-actions .btn-gradient-primary {
+  width: 100%;
+}
+
+.auto-upload-device-id {
+  font-size: 0.7rem;
+  color: var(--text-muted, #94a3b8);
+  margin: 0.75rem 0 0;
+}
+
+.auto-upload-instance-banner {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
+.auto-upload-tray-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+}
+
+.auto-upload-tray-option input {
+  margin-top: 0.15rem;
+}
+
+.auto-upload-loading {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-muted, #64748b);
+}
+
 .token-warning {
   font-size: 0.8rem;
   margin-bottom: 1rem;
@@ -1322,6 +1548,11 @@ h1 {
   font-size: 0.8125rem;
   color: var(--text-muted);
   line-height: 1.45;
+}
+
+.rankings-browser__rows-warn {
+  margin: 0.35rem 0 0.65rem;
+  color: var(--rb-warn, #c9a227);
 }
 
 .rankings-browser__grid {

@@ -23,7 +23,17 @@ import (
 )
 
 // AppVersion is shown in the uploader header (keep in sync with wails.json info.version).
-const AppVersion = "3.1.0"
+const AppVersion = "3.2.0"
+
+// nativeUploaderClientHeader identifies server-side API calls from the desktop app.
+const nativeUploaderClientHeader = "X-Wow-Logs-Native-Uploader"
+
+func setNativeUploaderAPIHeaders(req *http.Request) {
+	if req == nil {
+		return
+	}
+	req.Header.Set(nativeUploaderClientHeader, "1")
+}
 
 type Config struct {
 	LogDirectory            string `json:"logDirectory"`
@@ -38,6 +48,10 @@ type Config struct {
 	WindowX                 int    `json:"windowX,omitempty"`
 	WindowY                 int    `json:"windowY,omitempty"`
 	WindowMaximised         bool   `json:"windowMaximised,omitempty"`
+	DefaultServer           string `json:"defaultServer,omitempty"`
+	AutoUploadEnabled       bool   `json:"autoUploadEnabled,omitempty"`
+	DeviceID                string `json:"deviceId,omitempty"`
+	DisableMinimizeToTray   bool   `json:"disableMinimizeToTray,omitempty"`
 }
 
 type App struct {
@@ -50,6 +64,13 @@ type App struct {
 	configPath   string
 	windowGeoMu  sync.Mutex
 	windowGeoStop chan struct{}
+	autoUploadMu      sync.Mutex
+	autoUploadStop    chan struct{}
+	autoUploadRunning bool
+	autoUploadUploading bool
+	autoUploadWatcher *autoUploadWatcherRuntime
+	autoUploadDriftMu sync.Mutex
+	autoUploadDriftPending *autoUploadDriftWaiter
 }
 
 func fallbackUploaderServers() []UploaderServer {
@@ -196,6 +217,15 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.applySavedWindowState()
 	a.startWindowGeometryWatcher()
+	a.initSystemTray()
+	if a.config.AutoUploadEnabled && a.hasTailBaseline() {
+		go func() {
+			if !a.ensureAutoUploadPremiumActive() {
+				return
+			}
+			a.startAutoUploadWatcher()
+		}()
+	}
 }
 
 // GetAppVersion returns the release version shown in the uploader header.
@@ -292,7 +322,9 @@ func (a *App) saveWindowState() {
 
 // Shutdown persists window geometry before exit (wired from main.go OnShutdown).
 func (a *App) Shutdown(ctx context.Context) {
+	a.stopAutoUploadWatcher()
 	a.stopWindowGeometryWatcher()
+	a.shutdownSystemTray()
 	a.saveWindowState()
 }
 
@@ -503,6 +535,19 @@ func (a *App) EnqueueJobs(preprocessId int, selectedInstances []Instance) (strin
 }
 
 func (a *App) StartMonitoringJob(preprocessId int) {
+	a.startJobMonitor(preprocessId, nil, "")
+}
+
+// StartMonitoringJobWithTailRefresh polls job status and advances the auto-upload tail baseline on success.
+func (a *App) StartMonitoringJobWithTailRefresh(preprocessId int, logDirectory string) {
+	logPath := ""
+	if strings.TrimSpace(logDirectory) != "" {
+		logPath = combatLogPath(logDirectory)
+	}
+	a.startJobMonitor(preprocessId, nil, logPath)
+}
+
+func (a *App) startJobMonitor(preprocessId int, autoCtx *autoUploadJobContext, tailRefreshLogPath string) {
 	a.pollLock.Lock()
 	if a.pendingPolls[preprocessId] {
 		log.Printf("[Go Backend] POLLING: Monitoring for PreprocessID %d is already active.", preprocessId)
@@ -527,11 +572,15 @@ func (a *App) StartMonitoringJob(preprocessId int) {
 		defer ticker.Stop()
 
 		notifiedLogs := make(map[int]bool)
+		anyUploaded := false
 
 		for {
 			select {
 			case <-timeout:
 				log.Printf("[Go Backend] POLLING: Timed out for PreprocessID: %d\n", preprocessId)
+				if autoCtx != nil {
+					a.handleAutoUploadJobsFinished(autoCtx, anyUploaded)
+				}
 				return
 			case <-ticker.C:
 				status, err := a.checkJobStatus(preprocessId)
@@ -545,6 +594,9 @@ func (a *App) StartMonitoringJob(preprocessId int) {
 				for _, logStatus := range status.Logs {
 					if !notifiedLogs[logStatus.ID] && (logStatus.Status == "uploaded" || logStatus.Status == "failed") {
 						log.Printf("[Go Backend] POLLING: Detected completed log %d with status '%s'. Notifying frontend.\n", logStatus.ID, logStatus.Status)
+						if logStatus.Status == "uploaded" {
+							anyUploaded = true
+						}
 						runtime.EventsEmit(a.ctx, "job_notification", map[string]interface{}{
 							"logId":      logStatus.ID,
 							"status":     logStatus.Status,
@@ -556,6 +608,13 @@ func (a *App) StartMonitoringJob(preprocessId int) {
 
 				if allJobsConsideredDone && len(notifiedLogs) == status.TotalJobs {
 					log.Printf("[Go Backend] POLLING: All %d jobs for PreprocessID %d are complete. Stopping poll.\n", status.TotalJobs, preprocessId)
+					if autoCtx != nil {
+						a.handleAutoUploadJobsFinished(autoCtx, anyUploaded)
+					} else if anyUploaded && tailRefreshLogPath != "" {
+						if err := a.advanceTailFingerprintFromLog(tailRefreshLogPath); err != nil {
+							log.Printf("[Go Backend] Could not refresh tail after manual upload: %v\n", err)
+						}
+					}
 					return
 				}
 			}
@@ -1432,6 +1491,7 @@ func (a *App) fetchJSONGET(pathQuery string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	setNativeUploaderAPIHeaders(req)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -1459,6 +1519,7 @@ func (a *App) fetchJSONPOST(path string, body []byte) ([]byte, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	setNativeUploaderAPIHeaders(req)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -1937,6 +1998,7 @@ func (a *App) fetchAddonRankingsFullQuery(q url.Values) ([]byte, error) {
 	if apiToken != "" {
 		req.Header.Set("X-API-Token", apiToken)
 	}
+	setNativeUploaderAPIHeaders(req)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -2020,6 +2082,10 @@ func (a *App) SavePremiumConfig(apiToken, apiTokenType, followedPlayers string) 
 	a.config.FollowedPlayers = strings.TrimSpace(followedPlayers)
 	if err := a.saveConfig(); err != nil {
 		return fmt.Errorf("failed to save premium config: %w", err)
+	}
+	if a.config.AutoUploadEnabled {
+		a.markPremiumChecked()
+		go a.ensureAutoUploadPremiumActive()
 	}
 	log.Printf("[Go Backend] Premium config saved. Token type: %s, Followed players: %s", a.config.ApiTokenType, a.config.FollowedPlayers)
 	return nil
