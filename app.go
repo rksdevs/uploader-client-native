@@ -80,6 +80,7 @@ func fallbackUploaderServers() []UploaderServer {
 	servers := []UploaderServer{
 		{ID: 0, Value: "Whitemane_Frostmourne", Label: "Whitemane-Frostmourne"},
 		{ID: 0, Value: "Whitemane_Gilneas", Label: "Whitemane-Gilneas"},
+		{ID: 0, Value: "Tauri_Evermoon", Label: "Tauri-Evermoon"},
 		{ID: 0, Value: "Warmane_Icecrown", Label: "Warmane - Icecrown"},
 		{ID: 0, Value: "Warmane_Onyxia", Label: "Warmane - Onyxia"},
 		{ID: 0, Value: "Sunwell", Label: "Sunwell"},
@@ -138,10 +139,11 @@ func normalizeServerLabels(servers []UploaderServer) []UploaderServer {
 		"AstraWow_Neltharion":       9,
 		"Whitemane_Frostmourne":     10,
 		"Whitemane_Gilneas":         11,
-		"Sunwell":                   12,
-		"CircleWow_x1":              13,
-		"CircleWow_x4":              14,
-		"CircleWow_x100":            15,
+		"Tauri_Evermoon":            12,
+		"Sunwell":                   13,
+		"CircleWow_x1":              14,
+		"CircleWow_x4":              15,
+		"CircleWow_x100":            16,
 	}
 
 	for i := range servers {
@@ -168,6 +170,8 @@ func normalizeServerLabels(servers []UploaderServer) []UploaderServer {
 			servers[i].Label = "Circle WoW (x100)"
 		case "Whitemane_Gilneas":
 			servers[i].Label = "Whitemane-Gilneas"
+		case "Tauri_Evermoon":
+			servers[i].Label = "Tauri-Evermoon"
 		case "AstraWow_Wrathion":
 			servers[i].Label = "Dev-Server-Testing"
 		case "AstraWow_Neltharion":
@@ -441,8 +445,8 @@ func (a *App) SelectWowDirectory() (string, error) {
 	return dir, nil
 }
 
-func (a *App) PreprocessLog(logDirectory string, serverName string) (*PreprocessResponse, error) {
-	log.Printf("[Go Backend] PREPROCESS: Starting for directory '%s', Server: '%s'\n", logDirectory, serverName)
+func (a *App) PreprocessLog(logDirectory string, serverName string, unlisted bool) (*PreprocessResponse, error) {
+	log.Printf("[Go Backend] PREPROCESS: Starting for directory '%s', Server: '%s' unlisted=%v\n", logDirectory, serverName, unlisted)
 	logPath := filepath.Join(logDirectory, "WoWCombatLog.txt")
 
 	// Local uploader limit.
@@ -488,6 +492,9 @@ func (a *App) PreprocessLog(logDirectory string, serverName string) (*Preprocess
 		return nil, fmt.Errorf("failed to copy zip data to form: %w", err)
 	}
 	_ = writer.WriteField("serverName", serverName)
+	if unlisted {
+		_ = writer.WriteField("unlisted", "true")
+	}
 	writer.Close()
 
 	// Make the HTTP POST request.
@@ -498,6 +505,10 @@ func (a *App) PreprocessLog(logDirectory string, serverName string) (*Preprocess
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 	req.Header.Set("X-Socket-ID", "wails-native-client-polling") // Use a static ID for polling
+	setNativeUploaderAPIHeaders(req)
+	if token := strings.TrimSpace(a.config.ApiToken); token != "" {
+		req.Header.Set("X-API-Token", token)
+	}
 
 	client := &http.Client{Timeout: 3 * time.Minute}
 	resp, err := client.Do(req)
@@ -522,13 +533,14 @@ func (a *App) PreprocessLog(logDirectory string, serverName string) (*Preprocess
 	return &preprocessResponse, nil
 }
 
-func (a *App) EnqueueJobs(preprocessId int, selectedInstances []Instance) (string, error) {
-	log.Printf("[Go Backend] ENQUEUE: Queuing %d jobs for PreprocessID: %d\n", len(selectedInstances), preprocessId)
+func (a *App) EnqueueJobs(preprocessId int, selectedInstances []Instance, unlisted bool) (string, error) {
+	log.Printf("[Go Backend] ENQUEUE: Queuing %d jobs for PreprocessID: %d unlisted=%v\n", len(selectedInstances), preprocessId, unlisted)
 
 	requestData, err := json.Marshal(map[string]interface{}{
 		"preprocessId":      preprocessId,
 		"selectedInstances": selectedInstances,
 		"socketId":          "wails-native-client-polling",
+		"unlisted":          unlisted,
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal enqueue request: %w", err)
@@ -540,6 +552,10 @@ func (a *App) EnqueueJobs(preprocessId int, selectedInstances []Instance) (strin
 		return "", fmt.Errorf("failed to create enqueue request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	setNativeUploaderAPIHeaders(req)
+	if token := strings.TrimSpace(a.config.ApiToken); token != "" {
+		req.Header.Set("X-API-Token", token)
+	}
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
@@ -548,12 +564,30 @@ func (a *App) EnqueueJobs(preprocessId int, selectedInstances []Instance) (strin
 	}
 	defer resp.Body.Close()
 
+	respBody, _ := io.ReadAll(resp.Body)
 	log.Printf("[Go Backend] ENQUEUE Response: Status: %s\n", resp.Status)
 
 	if resp.StatusCode != http.StatusAccepted {
-		return "", fmt.Errorf("server returned non-202 status: %s", resp.Status)
+		var parsed struct {
+			Message string `json:"message"`
+		}
+		_ = json.Unmarshal(respBody, &parsed)
+		if strings.TrimSpace(parsed.Message) != "" {
+			return "", fmt.Errorf("%s", parsed.Message)
+		}
+		return "", fmt.Errorf("server returned %s: %s", resp.Status, strings.TrimSpace(string(respBody)))
 	}
 
+	anyPrivate := false
+	for _, inst := range selectedInstances {
+		if inst.Unlisted {
+			anyPrivate = true
+			break
+		}
+	}
+	if anyPrivate {
+		return "Queued. Private slices are not ranked or listed — open them from My private logs on the website.", nil
+	}
 	return "Jobs successfully queued! You will be notified upon completion.", nil
 }
 

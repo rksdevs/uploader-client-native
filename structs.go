@@ -18,6 +18,7 @@ type Instance struct {
 	LineEnd            int              `json:"lineEnd"`
 	ServerName         string           `json:"serverName,omitempty"`
 	ServerVerified     bool             `json:"serverVerified,omitempty"`
+	Unlisted           bool             `json:"unlisted,omitempty"`
 	Preview            *InstancePreview `json:"preview"`
 }
 

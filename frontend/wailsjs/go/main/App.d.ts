@@ -20,7 +20,7 @@ export function DisableAutoUpload():Promise<void>;
 
 export function EnqueueAutoUploadJobs(arg1:number,arg2:Array<main.Instance>,arg3:string,arg4:string):Promise<string>;
 
-export function EnqueueJobs(arg1:number,arg2:Array<main.Instance>):Promise<string>;
+export function EnqueueJobs(arg1:number,arg2:Array<main.Instance>,arg3:boolean):Promise<string>;
 
 export function EstablishAutoUploadBaseline(arg1:string):Promise<main.BaselinePreview>;
 
@@ -66,7 +66,7 @@ export function OpenLogPage(arg1:number):Promise<void>;
 
 export function PrepareAutoUploadStagingNow():Promise<main.AutoUploadWatcherStatus>;
 
-export function PreprocessLog(arg1:string,arg2:string):Promise<main.PreprocessResponse>;
+export function PreprocessLog(arg1:string,arg2:string,arg3:boolean):Promise<main.PreprocessResponse>;
 
 export function ResolveAutoUploadServerDrift(arg1:string):Promise<void>;
 

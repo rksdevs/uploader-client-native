@@ -288,6 +288,24 @@ h1 {
   user-select: none;
 }
 
+.private-log-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.private-log-disclaimer,
+.private-log-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.private-log-hint {
+  color: #d97706;
+}
+
 .instance-list {
   max-height: 400px;
   overflow-y: auto;
@@ -320,7 +338,7 @@ h1 {
 
 .instance-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 1rem;
   padding: 0.75rem;
   background-color: var(--bg-card);
@@ -349,6 +367,45 @@ h1 {
   align-items: center;
   width: 100%;
   gap: 0;
+  flex-wrap: wrap;
+}
+
+.instance-private-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 1rem 0.4rem;
+}
+
+.instance-private-row label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.select-all-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+}
+
+.private-mark-btn {
+  border: 1px solid var(--border-soft);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.private-mark-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .instance-column {

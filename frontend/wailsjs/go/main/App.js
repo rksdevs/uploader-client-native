@@ -38,8 +38,8 @@ export function EnqueueAutoUploadJobs(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['EnqueueAutoUploadJobs'](arg1, arg2, arg3, arg4);
 }
 
-export function EnqueueJobs(arg1, arg2) {
-  return window['go']['main']['App']['EnqueueJobs'](arg1, arg2);
+export function EnqueueJobs(arg1, arg2, arg3) {
+  return window['go']['main']['App']['EnqueueJobs'](arg1, arg2, arg3);
 }
 
 export function EstablishAutoUploadBaseline(arg1) {
@@ -130,8 +130,8 @@ export function PrepareAutoUploadStagingNow() {
   return window['go']['main']['App']['PrepareAutoUploadStagingNow']();
 }
 
-export function PreprocessLog(arg1, arg2) {
-  return window['go']['main']['App']['PreprocessLog'](arg1, arg2);
+export function PreprocessLog(arg1, arg2, arg3) {
+  return window['go']['main']['App']['PreprocessLog'](arg1, arg2, arg3);
 }
 
 export function ResolveAutoUploadServerDrift(arg1) {

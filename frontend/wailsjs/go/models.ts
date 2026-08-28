@@ -183,6 +183,7 @@ export namespace main {
 	    lineEnd: number;
 	    serverName?: string;
 	    serverVerified?: boolean;
+	    unlisted?: boolean;
 	    preview?: InstancePreview;
 	
 	    static createFrom(source: any = {}) {
@@ -199,6 +200,7 @@ export namespace main {
 	        this.lineEnd = source["lineEnd"];
 	        this.serverName = source["serverName"];
 	        this.serverVerified = source["serverVerified"];
+	        this.unlisted = source["unlisted"];
 	        this.preview = this.convertValues(source["preview"], InstancePreview);
 	    }
 	

@@ -72,6 +72,7 @@ function App() {
   const [showPremiumSettings, setShowPremiumSettings] = useState<boolean>(false);
   const [apiToken, setApiToken] = useState<string>("");
   const [apiTokenType, setApiTokenType] = useState<string>("personal");
+  const [defaultUnlisted, setDefaultUnlisted] = useState(false);
   const [followedPlayers, setFollowedPlayers] = useState<string>("");
   const [isSavingPremium, setIsSavingPremium] = useState<boolean>(false);
   const [showClearConfirm, setShowClearConfirm] = useState<boolean>(false);
@@ -366,7 +367,13 @@ function App() {
     setIsProcessing(true);
     setStatusMessage("Scanning log for raid instances...");
 
-    PreprocessLog(logDirectory, selectedServer)
+    PreprocessLog(
+      logDirectory,
+      selectedServer,
+      defaultUnlisted &&
+        !!apiToken.trim() &&
+        apiTokenType !== "guild"
+    )
       .then((response) => {
         if (response.autoQueued) {
           toast.success(response.message);
@@ -407,7 +414,7 @@ function App() {
           autoUploadSourceLogPath,
           autoUploadStagingPath
         )
-      : EnqueueJobs(preprocessId, instancesForGo);
+      : EnqueueJobs(preprocessId, instancesForGo, false);
 
     queuePromise
       .then((result) => {
@@ -718,6 +725,37 @@ function App() {
                 onOpenPremiumSettings={() => setShowPremiumSettings(true)}
               />
 
+              <div className="private-log-box" style={{ marginBottom: "0.75rem" }}>
+                <div className="select-all-container">
+                  <input
+                    type="checkbox"
+                    id="unlisted-log-upload"
+                    checked={
+                      defaultUnlisted &&
+                      !!apiToken.trim() &&
+                      apiTokenType !== "guild"
+                    }
+                    onChange={(e) => setDefaultUnlisted(e.target.checked)}
+                    disabled={
+                      isProcessing ||
+                      !apiToken.trim() ||
+                      apiTokenType === "guild"
+                    }
+                  />
+                  <label htmlFor="unlisted-log-upload">
+                    Private (unlisted)
+                  </label>
+                </div>
+                <p className="private-log-disclaimer">
+                  If this file has a single raid slice, that slice is queued
+                  with this choice (the instance picker is skipped). If multiple
+                  slices are found, you can still mark each slice private or
+                  public on the next screen. Automatic watcher uploads always
+                  stay public. Requires a personal addon API token (premium);
+                  free users should upload private logs from the website.
+                </p>
+              </div>
+
               <div className="action-grid-2">
                 <UploadButton
                   onUpload={handlePreprocess}
@@ -771,6 +809,12 @@ function App() {
                 selectedServer={selectedServer}
                 serverOptions={serverOptions}
                 hasMultipleDetectedServers={hasMultipleDetectedServers}
+                canMarkPrivate={
+                  !isAutoUploadInstanceFlow &&
+                  !!apiToken &&
+                  apiTokenType !== "guild"
+                }
+                defaultUnlisted={defaultUnlisted}
               />
             </div>
           )}

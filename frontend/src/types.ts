@@ -16,6 +16,7 @@ export interface Instance {
   lineEnd: number;
   serverName?: string;
   serverVerified?: boolean;
+  unlisted?: boolean;
   preview?: InstancePreview;
 }
 

@@ -10,6 +10,8 @@ interface InstanceSelectorProps {
   selectedServer: string;
   serverOptions: ServerOption[];
   hasMultipleDetectedServers: boolean;
+  canMarkPrivate: boolean;
+  defaultUnlisted: boolean;
 }
 
 function InstanceSelector({
@@ -20,10 +22,21 @@ function InstanceSelector({
   selectedServer,
   serverOptions,
   hasMultipleDetectedServers,
+  canMarkPrivate,
+  defaultUnlisted,
 }: InstanceSelectorProps) {
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
     new Set()
   );
+  const [instanceUnlisted, setInstanceUnlisted] = useState<
+    Record<number, boolean>
+  >(() => {
+    const initial: Record<number, boolean> = {};
+    instances.forEach((_, index) => {
+      initial[index] = defaultUnlisted && canMarkPrivate;
+    });
+    return initial;
+  });
   const [instanceServerSelection, setInstanceServerSelection] = useState<
     Record<number, string>
   >(() => {
@@ -82,6 +95,7 @@ function InstanceSelector({
         ...instance,
         serverName: instanceServerSelection[index] || selectedServer,
         serverVerified: !!instanceServerVerified[index],
+        unlisted: !!(instanceUnlisted[index] && canMarkPrivate),
       }));
     if (selected.length > 0) {
       onProcess(selected);
@@ -118,7 +132,7 @@ function InstanceSelector({
     <div className="instance-selector">
       <h2>Select Raid Instances to Process</h2>
 
-      <div className="select-all-container">
+      <div className="select-all-container select-all-row">
         <input
           type="checkbox"
           id="select-all"
@@ -130,6 +144,58 @@ function InstanceSelector({
           disabled={isProcessing}
         />
         <label htmlFor="select-all">Select All Instances</label>
+        {canMarkPrivate ? (
+          <>
+            <button
+              type="button"
+              className="private-mark-btn"
+              disabled={isProcessing || selectedIndices.size === 0}
+              onClick={() => {
+                setInstanceUnlisted((prev) => {
+                  const next = { ...prev };
+                  selectedIndices.forEach((idx) => {
+                    next[idx] = true;
+                  });
+                  return next;
+                });
+              }}
+            >
+              Mark selected private
+            </button>
+            <button
+              type="button"
+              className="private-mark-btn"
+              disabled={isProcessing || selectedIndices.size === 0}
+              onClick={() => {
+                setInstanceUnlisted((prev) => {
+                  const next = { ...prev };
+                  selectedIndices.forEach((idx) => {
+                    next[idx] = false;
+                  });
+                  return next;
+                });
+              }}
+            >
+              Mark selected public
+            </button>
+          </>
+        ) : null}
+      </div>
+
+      <div className="private-log-box">
+        <p className="private-log-disclaimer">
+          Privacy is per slice. Tick Private on each instance, or use the
+          buttons above. Not shown on the homepage, not ranked, and not used in
+          duplicate-log showdown. Only you can compare using a private log. Free
+          accounts: 5 stored and 5 private uploads per UTC month. Automatic
+          uploads stay public.
+        </p>
+        {!canMarkPrivate ? (
+          <p className="private-log-hint">
+            Add your personal addon API token in Premium settings to upload a
+            private log (guild tokens cannot own private logs).
+          </p>
+        ) : null}
       </div>
 
       <div className="instance-list">
@@ -149,6 +215,23 @@ function InstanceSelector({
                 disabled={isProcessing}
               />
               <div className="instance-content">
+                <div className="instance-private-row">
+                  <input
+                    type="checkbox"
+                    id={`unlisted-slice-${index}`}
+                    checked={!!(instanceUnlisted[index] && canMarkPrivate)}
+                    onChange={(e) =>
+                      setInstanceUnlisted((prev) => ({
+                        ...prev,
+                        [index]: e.target.checked,
+                      }))
+                    }
+                    disabled={isProcessing || !canMarkPrivate}
+                  />
+                  <label htmlFor={`unlisted-slice-${index}`}>
+                    Private (unlisted)
+                  </label>
+                </div>
                 <div className="instance-column">
                   <div className="info-row">
                     <span className="info-label">First Boss:</span>
