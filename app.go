@@ -92,9 +92,11 @@ func fallbackUploaderServers() []UploaderServer {
 		{ID: 0, Value: "Rising_Gods", Label: "Rising - Gods"},
 		{ID: 0, Value: "Chromiecraft", Label: "Chromiecraft"},
 		{ID: 0, Value: "Wow_Patagonia", Label: "Wow - Patagonia"},
+		{ID: 0, Value: "Whitemane_FM_S2", Label: "Whitemane - FM S2"},
 		{ID: 0, Value: "CircleWow_x1", Label: "Circle WoW (x1)"},
 		{ID: 0, Value: "CircleWow_x4", Label: "Circle WoW (x4)"},
 		{ID: 0, Value: "CircleWow_x100", Label: "Circle WoW (x100)"},
+		{ID: 0, Value: "CCWOW_CCWLK", Label: "CCWOW - CCWLK"},
 	}
 	return normalizeServerLabels(servers)
 }
@@ -135,15 +137,17 @@ func normalizeServerLabels(servers []UploaderServer) []UploaderServer {
 		"Rising_Gods":               5,
 		"Chromiecraft":              6,
 		"Wow_Patagonia":             7,
-		"AstraWow_Wrathion":         8,
-		"AstraWow_Neltharion":       9,
-		"Whitemane_Frostmourne":     10,
-		"Whitemane_Gilneas":         11,
-		"Tauri_Evermoon":            12,
-		"Sunwell":                   13,
-		"CircleWow_x1":              14,
-		"CircleWow_x4":              15,
-		"CircleWow_x100":            16,
+		"Whitemane_FM_S2":           8,
+		"AstraWow_Wrathion":         9,
+		"AstraWow_Neltharion":       10,
+		"Whitemane_Frostmourne":     11,
+		"Whitemane_Gilneas":         12,
+		"Tauri_Evermoon":            13,
+		"Sunwell":                   14,
+		"CircleWow_x1":              15,
+		"CircleWow_x4":              16,
+		"CircleWow_x100":            17,
+		"CCWOW_CCWLK":               18,
 	}
 
 	for i := range servers {
@@ -168,6 +172,10 @@ func normalizeServerLabels(servers []UploaderServer) []UploaderServer {
 			servers[i].Label = "Circle WoW (x4)"
 		case "CircleWow_x100":
 			servers[i].Label = "Circle WoW (x100)"
+		case "Whitemane_FM_S2":
+			servers[i].Label = "Whitemane - FM S2"
+		case "CCWOW_CCWLK":
+			servers[i].Label = "CCWOW - CCWLK"
 		case "Whitemane_Gilneas":
 			servers[i].Label = "Whitemane-Gilneas"
 		case "Tauri_Evermoon":
