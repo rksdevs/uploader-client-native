@@ -78,7 +78,7 @@ function App() {
   const [showClearConfirm, setShowClearConfirm] = useState<boolean>(false);
   const [showAddonHelp, setShowAddonHelp] = useState<boolean>(false);
   const [theme, setTheme] = useState<string>("light");
-  const [appVersion, setAppVersion] = useState<string>("3.2.1");
+  const [appVersion, setAppVersion] = useState<string>("3.2.4");
   const [serverDrift, setServerDrift] = useState<ServerDriftState | null>(null);
   const [isResolvingDrift, setIsResolvingDrift] = useState(false);
 

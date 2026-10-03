@@ -15,6 +15,12 @@ This application is built with **[Wails](https://wails.io)** (Go + React/TypeScr
 - **Followed Players** – Keep track of specific players by adding them to your followers list.
 - **CSV String Serialization** – Supports ultra-fast syncing of massive data payloads (13MB+) to the WoW Addon.
 
+### Diagnostics (support)
+
+- **Local log file** (Windows): `%APPDATA%\WoWLogsUploader\logs\uploader.log`
+- Newest entries are at the **top** of the file; total size is capped at **1 MB** (oldest lines are dropped).
+- Captures backend `log` output, window resize/position/off-screen recovery, tray open, Wails startup/shutdown errors, and frontend `console.error` / uncaught exceptions.
+
 ### Core Features
 - **Persistent Directory** – Save your WoW Logs folder path once and reuse it automatically.
 - **Multi-Instance Support** – Detect and process multiple raid instances from a single combat log.

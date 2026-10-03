@@ -12,7 +12,9 @@ func (a *App) updateTrayStatus(string) {}
 
 func (a *App) updateTrayStatusFromWatcher() {}
 
-func (a *App) showMainWindow() {}
+func (a *App) showMainWindow() {
+	a.recoverWindowIfOffScreen()
+}
 
 func (a *App) onBeforeClose(ctx context.Context) bool {
 	return false

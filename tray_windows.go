@@ -120,8 +120,10 @@ func (a *App) showMainWindow() {
 	if a.ctx == nil {
 		return
 	}
+	WriteAppLog("INFO", "window", "tray: Open main window")
 	runtime.WindowShow(a.ctx)
 	runtime.WindowUnminimise(a.ctx)
+	a.recoverWindowIfOffScreen()
 }
 
 func (a *App) quitFromTray() {

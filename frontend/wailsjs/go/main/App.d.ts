@@ -46,6 +46,8 @@ export function GetAutoUploadSettings():Promise<main.AutoUploadSettingsResponse>
 
 export function GetAutoUploadWatcherStatus():Promise<main.AutoUploadWatcherStatus>;
 
+export function GetDiagnosticLogPath():Promise<string>;
+
 export function GetMinimizeToTray():Promise<boolean>;
 
 export function GetPremiumConfig():Promise<Record<string, string>>;
@@ -59,6 +61,8 @@ export function GetUploaderServers():Promise<Array<main.UploaderServer>>;
 export function GetWowDirectory():Promise<string>;
 
 export function IsServerAllowedForAutoUpload(arg1:string):Promise<boolean>;
+
+export function LogClientMessage(arg1:string,arg2:string):Promise<void>;
 
 export function OpenAllLogsPage():Promise<void>;
 

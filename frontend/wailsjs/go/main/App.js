@@ -90,6 +90,10 @@ export function GetAutoUploadWatcherStatus() {
   return window['go']['main']['App']['GetAutoUploadWatcherStatus']();
 }
 
+export function GetDiagnosticLogPath() {
+  return window['go']['main']['App']['GetDiagnosticLogPath']();
+}
+
 export function GetMinimizeToTray() {
   return window['go']['main']['App']['GetMinimizeToTray']();
 }
@@ -116,6 +120,10 @@ export function GetWowDirectory() {
 
 export function IsServerAllowedForAutoUpload(arg1) {
   return window['go']['main']['App']['IsServerAllowedForAutoUpload'](arg1);
+}
+
+export function LogClientMessage(arg1, arg2) {
+  return window['go']['main']['App']['LogClientMessage'](arg1, arg2);
 }
 
 export function OpenAllLogsPage() {

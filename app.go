@@ -23,7 +23,7 @@ import (
 )
 
 // AppVersion is shown in the uploader header (keep in sync with wails.json info.version).
-const AppVersion = "3.2.1"
+const AppVersion = "3.2.4"
 
 // nativeUploaderClientHeader identifies server-side API calls from the desktop app.
 const nativeUploaderClientHeader = "X-Wow-Logs-Native-Uploader"
@@ -33,6 +33,15 @@ func setNativeUploaderAPIHeaders(req *http.Request) {
 		return
 	}
 	req.Header.Set(nativeUploaderClientHeader, "1")
+}
+
+type windowGeoSnapshot struct {
+	set       bool
+	maximised bool
+	w         int
+	h         int
+	x         int
+	y         int
 }
 
 type Config struct {
@@ -62,8 +71,10 @@ type App struct {
 	pollLock     sync.Mutex
 	config       Config
 	configPath   string
-	windowGeoMu  sync.Mutex
-	windowGeoStop chan struct{}
+	windowGeoMu       sync.Mutex
+	windowGeoStop     chan struct{}
+	windowGeoLogMu    sync.Mutex
+	windowGeoLogSnap  windowGeoSnapshot
 	autoUploadMu      sync.Mutex
 	autoUploadStop    chan struct{}
 	autoUploadRunning bool
@@ -75,19 +86,37 @@ type App struct {
 	appQuitting  bool
 }
 
+// inactiveUploaderServers — retired realms; hidden from the server picker (API list is filtered too).
+var inactiveUploaderServers = map[string]bool{
+	"Stormforge_Frostmourne_S1": true,
+	"Whitemane_Frostmourne":     true,
+	"Sunwell":                   true,
+}
+
+func filterInactiveUploaderServers(servers []UploaderServer) []UploaderServer {
+	if len(servers) == 0 {
+		return servers
+	}
+	out := make([]UploaderServer, 0, len(servers))
+	for _, s := range servers {
+		if inactiveUploaderServers[s.Value] {
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
 func fallbackUploaderServers() []UploaderServer {
 	// Offline / API-failure list — keep aligned with log-parser `ADDON_REALM_LABELS` and common Server.name values.
 	servers := []UploaderServer{
-		{ID: 0, Value: "Whitemane_Frostmourne", Label: "Whitemane-Frostmourne"},
 		{ID: 0, Value: "Whitemane_Gilneas", Label: "Whitemane-Gilneas"},
 		{ID: 0, Value: "Tauri_Evermoon", Label: "Tauri-Evermoon"},
 		{ID: 0, Value: "Warmane_Icecrown", Label: "Warmane - Icecrown"},
 		{ID: 0, Value: "Warmane_Onyxia", Label: "Warmane - Onyxia"},
-		{ID: 0, Value: "Sunwell", Label: "Sunwell"},
 		{ID: 0, Value: "AstraWow_Wrathion", Label: "Dev-Server-Testing"},
 		{ID: 0, Value: "AstraWow_Neltharion", Label: "WOTLK-PTR-Server"},
 		{ID: 0, Value: "Warmane_Lordaeron", Label: "Warmane - Lordaeron"},
-		{ID: 0, Value: "Stormforge_Frostmourne_S1", Label: "Stormforge - FrostmourneS1"},
 		{ID: 0, Value: "Freedom_Wow", Label: "Freedom - WoW"},
 		{ID: 0, Value: "Rising_Gods", Label: "Rising - Gods"},
 		{ID: 0, Value: "Chromiecraft", Label: "Chromiecraft"},
@@ -129,25 +158,22 @@ func mergeUploaderServers(api []UploaderServer, fallback []UploaderServer) []Upl
 
 func normalizeServerLabels(servers []UploaderServer) []UploaderServer {
 	order := map[string]int{
-		"Warmane_Lordaeron":         0,
-		"Warmane_Icecrown":          1,
-		"Warmane_Onyxia":            2,
-		"Stormforge_Frostmourne_S1": 3,
-		"Freedom_Wow":               4,
-		"Rising_Gods":               5,
-		"Chromiecraft":              6,
-		"Wow_Patagonia":             7,
-		"Whitemane_FM_S2":           8,
-		"AstraWow_Wrathion":         9,
-		"AstraWow_Neltharion":       10,
-		"Whitemane_Frostmourne":     11,
-		"Whitemane_Gilneas":         12,
-		"Tauri_Evermoon":            13,
-		"Sunwell":                   14,
-		"CircleWow_x1":              15,
-		"CircleWow_x4":              16,
-		"CircleWow_x100":            17,
-		"CCWOW_CCWLK":               18,
+		"Warmane_Lordaeron":   0,
+		"Warmane_Icecrown":    1,
+		"Warmane_Onyxia":      2,
+		"Freedom_Wow":         3,
+		"Rising_Gods":           4,
+		"Chromiecraft":          5,
+		"Wow_Patagonia":         6,
+		"Whitemane_FM_S2":       7,
+		"AstraWow_Wrathion":     8,
+		"AstraWow_Neltharion":   9,
+		"Whitemane_Gilneas":     10,
+		"Tauri_Evermoon":        11,
+		"CircleWow_x1":          12,
+		"CircleWow_x4":          13,
+		"CircleWow_x100":        14,
+		"CCWOW_CCWLK":           15,
 	}
 
 	for i := range servers {
@@ -158,8 +184,6 @@ func normalizeServerLabels(servers []UploaderServer) []UploaderServer {
 			servers[i].Label = "Warmane - Icecrown"
 		case "Warmane_Onyxia":
 			servers[i].Label = "Warmane - Onyxia"
-		case "Stormforge_Frostmourne_S1":
-			servers[i].Label = "Stormforge - FrostmourneS1"
 		case "Freedom_Wow":
 			servers[i].Label = "Freedom - WoW"
 		case "Rising_Gods":
@@ -213,6 +237,7 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	WriteAppLog("INFO", "startup", "Wails OnStartup")
 	log.Println("[Go Backend] Startup complete.")
 
 	env := runtime.Environment(a.ctx)
@@ -230,6 +255,7 @@ func (a *App) startup(ctx context.Context) {
 		log.Printf("[Go Backend] Could not load config file (this is normal on first run): %v\n", err)
 	}
 	a.applySavedWindowState()
+	a.recoverWindowIfOffScreen()
 	a.startWindowGeometryWatcher()
 	a.initSystemTray()
 	if a.config.AutoUploadEnabled && a.hasTailBaseline() {
@@ -247,20 +273,54 @@ func (a *App) GetAppVersion() string {
 	return AppVersion
 }
 
+// recoverWindowIfOffScreen centers the window when it was restored onto a disconnected monitor.
+func (a *App) recoverWindowIfOffScreen() {
+	if a.ctx == nil {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[Go Backend] recoverWindowIfOffScreen skipped: %v\n", r)
+		}
+	}()
+	if runtime.WindowIsMaximised(a.ctx) {
+		return
+	}
+	w, h := runtime.WindowGetSize(a.ctx)
+	x, y := runtime.WindowGetPosition(a.ctx)
+	if isWindowPlacementVisible(x, y, w, h) {
+		return
+	}
+	log.Printf("[Go Backend] Window off-screen (%d,%d); centering.\n", x, y)
+	WriteAppLog("WARN", "window", fmt.Sprintf("off-screen at (%d,%d) size %dx%d; centering", x, y, w, h))
+	runtime.WindowCenter(a.ctx)
+}
+
 func (a *App) applySavedWindowState() {
 	if a.ctx == nil {
 		return
 	}
 	if a.config.WindowMaximised {
+		WriteAppLog("INFO", "window", "restore saved state: maximised")
 		runtime.WindowMaximise(a.ctx)
 		return
 	}
 	if a.config.WindowWidth >= 720 && a.config.WindowHeight >= 560 {
-		runtime.WindowSetSize(a.ctx, a.config.WindowWidth, a.config.WindowHeight)
-		runtime.WindowSetPosition(a.ctx, a.config.WindowX, a.config.WindowY)
+		w, h := a.config.WindowWidth, a.config.WindowHeight
+		x, y := a.config.WindowX, a.config.WindowY
+		runtime.WindowSetSize(a.ctx, w, h)
+		if isWindowPlacementVisible(x, y, w, h) {
+			WriteAppLog("INFO", "window", fmt.Sprintf("restore saved state: size=%dx%d pos=(%d,%d)", w, h, x, y))
+			runtime.WindowSetPosition(a.ctx, x, y)
+		} else {
+			log.Printf("[Go Backend] Saved window off-screen (%d,%d); centering on primary display.\n", x, y)
+			WriteAppLog("WARN", "window", fmt.Sprintf("saved position off-screen (%d,%d); centering", x, y))
+			runtime.WindowCenter(a.ctx)
+		}
 		return
 	}
 	// First run: no saved geometry — default to maximised (previous behaviour).
+	WriteAppLog("INFO", "window", "no saved geometry; maximising")
 	runtime.WindowMaximise(a.ctx)
 }
 
@@ -292,6 +352,26 @@ func (a *App) captureWindowStateSafe() {
 		a.config.WindowX = x
 		a.config.WindowY = y
 	}
+	a.logWindowGeometryIfChanged(maximised, w, h, x, y)
+}
+
+func (a *App) logWindowGeometryIfChanged(maximised bool, w, h, x, y int) {
+	a.windowGeoLogMu.Lock()
+	prev := a.windowGeoLogSnap
+	changed := !prev.set || prev.maximised != maximised || prev.w != w || prev.h != h || prev.x != x || prev.y != y
+	if changed {
+		a.windowGeoLogSnap = windowGeoSnapshot{true, maximised, w, h, x, y}
+	}
+	a.windowGeoLogMu.Unlock()
+	if !changed {
+		return
+	}
+	if maximised {
+		WriteAppLog("INFO", "window", "resize/maximise: maximised=true")
+		return
+	}
+	visible := isWindowPlacementVisible(x, y, w, h)
+	WriteAppLog("INFO", "window", fmt.Sprintf("resize: size=%dx%d pos=(%d,%d) onScreen=%v", w, h, x, y, visible))
 }
 
 func (a *App) startWindowGeometryWatcher() {
@@ -357,6 +437,7 @@ func (a *App) requestAppQuit() {
 
 // Shutdown persists window geometry before exit (wired from main.go OnShutdown).
 func (a *App) Shutdown(ctx context.Context) {
+	WriteAppLog("INFO", "shutdown", "application shutting down")
 	a.stopAutoUploadWatcher()
 	a.stopWindowGeometryWatcher()
 	a.shutdownSystemTray()
@@ -716,27 +797,27 @@ func (a *App) GetUploaderServers() []UploaderServer {
 	resp, err := client.Get(apiURL)
 	if err != nil {
 		log.Printf("[Go Backend] Failed to fetch uploader servers, using fallback: %v\n", err)
-		return fallbackUploaderServers()
+		return filterInactiveUploaderServers(fallbackUploaderServers())
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("[Go Backend] Server list API returned %s, using fallback\n", resp.Status)
-		return fallbackUploaderServers()
+		return filterInactiveUploaderServers(fallbackUploaderServers())
 	}
 
 	var payload UploaderServersResponse
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
 		log.Printf("[Go Backend] Failed to decode uploader server list, using fallback: %v\n", err)
-		return fallbackUploaderServers()
+		return filterInactiveUploaderServers(fallbackUploaderServers())
 	}
 
 	if len(payload.Servers) == 0 {
-		return fallbackUploaderServers()
+		return filterInactiveUploaderServers(fallbackUploaderServers())
 	}
 
 	merged := mergeUploaderServers(payload.Servers, fallbackUploaderServers())
-	return normalizeServerLabels(merged)
+	return filterInactiveUploaderServers(normalizeServerLabels(merged))
 }
 
 func (a *App) OpenLogPage(logId int) {

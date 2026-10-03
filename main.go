@@ -12,6 +12,10 @@ import (
 var assets embed.FS
 
 func main() {
+	if err := InitDiagnosticLogger(); err != nil {
+		println("Failed to init diagnostic log:", err.Error())
+	}
+
 	app := NewApp()
 
 	err := wails.Run(&options.App{
@@ -35,6 +39,9 @@ func main() {
 	})
 
 	if err != nil {
-		println("Error:", err.Error())
+		msg := err.Error()
+		println("Error:", msg)
+		WriteAppLog("ERROR", "wails", msg)
 	}
+	WriteAppLog("INFO", "shutdown", "main returned")
 }
