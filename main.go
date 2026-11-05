@@ -20,17 +20,17 @@ func main() {
 
 	err := wails.Run(&options.App{
 		Title:             "WoW Logs Uploader",
-		Width:             1280,
-		Height:            800,
-		MinWidth:          720,
-		MinHeight:         560,
+		Width:             1400,
+		Height:            880,
+		MinWidth:          960,
+		MinHeight:         640,
 		WindowStartState:  options.Normal,
 		HideWindowOnClose: true,
 		OnBeforeClose:     app.onBeforeClose,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 15, G: 23, B: 42, A: 1},
+		BackgroundColour: &options.RGBA{R: 12, G: 10, B: 9, A: 1},
 		OnStartup:        app.startup,
 		OnShutdown:       app.Shutdown,
 		Bind: []interface{}{

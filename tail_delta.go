@@ -47,15 +47,15 @@ func findTailSplitOffset(logPath string, state TailState) (tailSplitResult, erro
 	}
 
 	// Fast path: LastByteOffset is the synced EOF from baseline / last successful tail.
-	if info.Size() > syncOffset {
+	if info.Size() >= syncOffset && tailEndsAtOffset(logPath, state.TailFingerprint, syncOffset) {
+		if info.Size() == syncOffset {
+			return tailSplitResult{}, errNoCombatLogDelta
+		}
 		reanchored := info.Size() < state.SourceFileSize
 		return tailSplitResult{SplitOffset: syncOffset, Reanchored: reanchored}, nil
 	}
-	if info.Size() == syncOffset {
-		return tailSplitResult{}, errNoCombatLogDelta
-	}
 
-	// File shrank — try to re-anchor using the stored fingerprint.
+	// The file shrank or was replaced — try to re-anchor using the stored fingerprint.
 	if len(state.TailFingerprint) == 0 {
 		return tailSplitResult{}, errNoCombatLogDelta
 	}
@@ -67,10 +67,12 @@ func findTailSplitOffset(logPath string, state TailState) (tailSplitResult, erro
 		return tailSplitResult{SplitOffset: matchEnd, Reanchored: true}, nil
 	}
 
-	return tailSplitResult{}, fmt.Errorf("could not locate tail baseline in combat log")
+	// The old content is gone (log cleared in-game), so everything in the file is new.
+	return tailSplitResult{SplitOffset: 0, Reanchored: true}, nil
 }
 
 // findFingerprintEndOffset returns the byte offset immediately after the matched fingerprint block.
+// Offsets come from the bytes actually read, so CRLF files stay exact.
 func findFingerprintEndOffset(logPath string, fingerprint []string, minOffset int64) (int64, bool) {
 	file, err := os.Open(logPath)
 	if err != nil {
@@ -78,48 +80,63 @@ func findFingerprintEndOffset(logPath string, fingerprint []string, minOffset in
 	}
 	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
-	scanner.Buffer(make([]byte, 0, 1024*1024), 16*1024*1024)
-
+	reader := bufio.NewReaderSize(file, 1024*1024)
 	var (
-		offset      int64
-		window      []string
-		windowStart []int64
-		lastMatch   int64 = -1
+		offset    int64
+		window    []string
+		lastMatch int64 = -1
 	)
-
-	appendWindow := func(line string, lineStart int64) {
-		window = append(window, line)
-		windowStart = append(windowStart, lineStart)
-		if len(window) > len(fingerprint) {
-			window = window[1:]
-			windowStart = windowStart[1:]
-		}
-		if len(window) == len(fingerprint) && linesEqual(window, fingerprint) {
-			end := lineStart + int64(len(line)) + 1
-			if lineStart >= minOffset || minOffset == 0 {
-				lastMatch = end
+	for {
+		raw, readErr := reader.ReadString('\n')
+		lineStart := offset
+		offset += int64(len(raw))
+		line := strings.TrimRight(raw, "\r\n")
+		if strings.TrimSpace(line) != "" {
+			window = append(window, line)
+			if len(window) > len(fingerprint) {
+				window = window[1:]
+			}
+			if len(window) == len(fingerprint) && linesEqual(window, fingerprint) {
+				if lineStart >= minOffset || minOffset == 0 {
+					lastMatch = offset
+				}
 			}
 		}
-	}
-
-	for scanner.Scan() {
-		lineStart := offset
-		line := scanner.Text()
-		offset += int64(len(line)) + 1
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
+		if readErr == io.EOF {
+			break
 		}
-		appendWindow(line, lineStart)
-	}
-	if err := scanner.Err(); err != nil {
-		return 0, false
+		if readErr != nil {
+			return 0, false
+		}
 	}
 	if lastMatch < 0 {
 		return 0, false
 	}
 	return lastMatch, true
+}
+
+// tailEndsAtOffset checks that the fingerprint's last line ends exactly at offset. If it does not,
+// the file was replaced (log cleared in-game) and the stored offset means nothing in this file.
+func tailEndsAtOffset(logPath string, fingerprint []string, offset int64) bool {
+	if len(fingerprint) == 0 {
+		return true
+	}
+	last := fingerprint[len(fingerprint)-1]
+	file, err := os.Open(logPath)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+
+	window := int64(len(last)) + 16
+	if window > offset {
+		window = offset
+	}
+	buf := make([]byte, window)
+	if _, err := file.ReadAt(buf, offset-window); err != nil {
+		return false
+	}
+	return strings.HasSuffix(strings.TrimRight(string(buf), "\r\n \t"), strings.TrimRight(last, "\r\n \t"))
 }
 
 // copyCombatLogDelta streams bytes from splitOffset to EOF into the staging file.

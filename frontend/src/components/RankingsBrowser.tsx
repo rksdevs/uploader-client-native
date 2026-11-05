@@ -7,6 +7,7 @@ import {
   FetchLeaderboardFilterDifficultiesJSON,
   FetchLeaderboardFilterRaidsJSON,
   FetchLeaderboardSeasonsConfigJSON,
+  OpenLogPage,
 } from "../../wailsjs/go/main/App";
 import { toast } from "sonner";
 import { difficultyOptionLabel } from "../lib/difficultyLabels";
@@ -256,6 +257,7 @@ function readPerformanceRow(row: Record<string, unknown>) {
     amount: num(row.amount),
     percentile: num(row.percentile),
     categoryRank,
+    logId: num(row.logId),
   };
 }
 
@@ -1243,6 +1245,7 @@ const RankingsBrowser: React.FC<RankingsBrowserProps> = ({
                     <th className="rb-col-diff">Diff</th>
                     <th className="rb-col-amt">{role === "HEALER" ? "HPS" : "DPS"}</th>
                     <th className="rb-col-perf">Performance</th>
+                    <th>Log</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1271,6 +1274,15 @@ const RankingsBrowser: React.FC<RankingsBrowserProps> = ({
                         <td className="rb-col-amt">{Number(r.amount).toFixed(0)}</td>
                         <td className="rb-col-perf">
                           <PercentilePerfCell percentile={r.percentile} />
+                        </td>
+                        <td>
+                          {r.logId > 0 ? (
+                            <button type="button" className="rb-log-link" onClick={() => void OpenLogPage(r.logId)}>
+                              #{r.logId}
+                            </button>
+                          ) : (
+                            "—"
+                          )}
                         </td>
                       </tr>
                     );

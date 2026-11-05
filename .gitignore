@@ -4,3 +4,10 @@ frontend/dist
 *.mjs
 *.mjs.map
 vite.config.ts.timestamp-*
+# Local builds and internal notes, not for the public repo
+bin/
+/native-uploader.exe
+*.stackdump
+docs/api-audit-2026-11-04.md
+docs/release-4.0-plan.md
+docs/ui-revamp-figma-prompt.md

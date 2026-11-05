@@ -80,7 +80,7 @@ func (a *App) autoUploadBlockReason(serverName string) string {
 	if strings.TrimSpace(a.config.LogDirectory) == "" {
 		return "Select your combat logs folder first."
 	}
-	if strings.TrimSpace(a.config.ApiToken) == "" {
+	if a.authToken() == "" {
 		return "Add your premium API token in Premium settings."
 	}
 	return ""
@@ -98,7 +98,7 @@ func (a *App) GetAutoUploadSettings() AutoUploadSettingsResponse {
 		BaselineEstablishedAt: state.BaselineEstablishedAt,
 		TailFingerprint:       state.TailFingerprint,
 		LogDirectory:          a.config.LogDirectory,
-		HasAPIToken:           strings.TrimSpace(a.config.ApiToken) != "",
+		HasAPIToken:           a.authToken() != "",
 		ServerAllowed:         a.IsServerAllowedForAutoUpload(server),
 	}
 	resp.BlockReason = a.autoUploadBlockReason(server)
@@ -221,7 +221,7 @@ func (a *App) EstablishAutoUploadBaseline(serverName string) (*BaselinePreview, 
 	if strings.TrimSpace(a.config.LogDirectory) == "" {
 		return nil, fmt.Errorf("combat logs folder is not configured")
 	}
-	if strings.TrimSpace(a.config.ApiToken) == "" {
+	if a.authToken() == "" {
 		return nil, fmt.Errorf("premium API token is required for auto-upload")
 	}
 

@@ -1,14 +1,12 @@
 package main
 
 import (
-	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
-	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -23,7 +21,7 @@ import (
 )
 
 // AppVersion is shown in the uploader header (keep in sync with wails.json info.version).
-const AppVersion = "3.2.4"
+const AppVersion = "4.0.0"
 
 // nativeUploaderClientHeader identifies server-side API calls from the desktop app.
 const nativeUploaderClientHeader = "X-Wow-Logs-Native-Uploader"
@@ -61,6 +59,7 @@ type Config struct {
 	AutoUploadEnabled       bool   `json:"autoUploadEnabled,omitempty"`
 	DeviceID                string `json:"deviceId,omitempty"`
 	DisableMinimizeToTray   bool   `json:"disableMinimizeToTray,omitempty"`
+	DesktopNotifications    bool   `json:"desktopNotifications,omitempty"`
 }
 
 type App struct {
@@ -84,6 +83,15 @@ type App struct {
 	autoUploadDriftPending *autoUploadDriftWaiter
 	appQuitMu    sync.Mutex
 	appQuitting  bool
+	historyOnce  sync.Once
+	historyStore *historyStore
+	uploadSources sync.Map // preprocessId -> uploadSource
+	sessionMu     sync.Mutex
+	sessionLoaded bool
+	sessionValue  string
+	signInMu      sync.Mutex
+	signInCancel  context.CancelFunc
+	signInURL     string
 }
 
 // inactiveUploaderServers — retired realms; hidden from the server picker (API list is filtered too).
@@ -266,6 +274,9 @@ func (a *App) startup(ctx context.Context) {
 			a.startAutoUploadWatcher()
 		}()
 	}
+	a.resumePendingAutoUpload()
+	a.resumeUnfinishedUploads()
+	removeOldExecutable()
 }
 
 // GetAppVersion returns the release version shown in the uploader header.
@@ -534,94 +545,6 @@ func (a *App) SelectWowDirectory() (string, error) {
 	return dir, nil
 }
 
-func (a *App) PreprocessLog(logDirectory string, serverName string, unlisted bool) (*PreprocessResponse, error) {
-	log.Printf("[Go Backend] PREPROCESS: Starting for directory '%s', Server: '%s' unlisted=%v\n", logDirectory, serverName, unlisted)
-	logPath := filepath.Join(logDirectory, "WoWCombatLog.txt")
-
-	// Local uploader limit.
-	const maxLogSizeBytes = 1 * 1024 * 1024 * 1024 // 1 GB
-	fileInfo, err := os.Stat(logPath)
-	if err != nil {
-		return nil, fmt.Errorf("could not access WoWCombatLog.txt: %w", err)
-	}
-	if fileInfo.Size() > maxLogSizeBytes {
-		sizeMB := fileInfo.Size() / 1024 / 1024
-		return nil, fmt.Errorf(
-			"WoWCombatLog.txt is too large to upload (%d MB). Maximum allowed size is 1024 MB. "+
-				"Please clear your log file in-game (type /combatlog in chat to toggle it off and on) before uploading.",
-			sizeMB,
-		)
-	}
-
-	logData, err := os.ReadFile(logPath)
-	if err != nil {
-		return nil, fmt.Errorf("could not read WoWCombatLog.txt: %w", err)
-	}
-
-	// Create a zip archive in memory.
-	buf := new(bytes.Buffer)
-	zipWriter := zip.NewWriter(buf)
-	fileWriter, err := zipWriter.Create("WoWCombatLog.txt")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create zip entry: %w", err)
-	}
-	if _, err = fileWriter.Write(logData); err != nil {
-		return nil, fmt.Errorf("failed to write data to zip entry: %w", err)
-	}
-	zipWriter.Close()
-
-	// Create a multipart form request.
-	requestBody := &bytes.Buffer{}
-	writer := multipart.NewWriter(requestBody)
-	part, err := writer.CreateFormFile("logFile", "WoWCombatLog.zip")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create form file: %w", err)
-	}
-	if _, err = io.Copy(part, buf); err != nil {
-		return nil, fmt.Errorf("failed to copy zip data to form: %w", err)
-	}
-	_ = writer.WriteField("serverName", serverName)
-	if unlisted {
-		_ = writer.WriteField("unlisted", "true")
-	}
-	writer.Close()
-
-	// Make the HTTP POST request.
-	apiURL := fmt.Sprintf("%s/api/v5/uploader/preprocess", a.apiBaseURL)
-	req, err := http.NewRequest("POST", apiURL, requestBody)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create preprocess request: %w", err)
-	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("X-Socket-ID", "wails-native-client-polling") // Use a static ID for polling
-	setNativeUploaderAPIHeaders(req)
-	if token := strings.TrimSpace(a.config.ApiToken); token != "" {
-		req.Header.Set("X-API-Token", token)
-	}
-
-	client := &http.Client{Timeout: 3 * time.Minute}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send preprocess request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	log.Printf("[Go Backend] PREPROCESS Response: Status: %s\n", resp.Status)
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
-		return nil, fmt.Errorf("server returned error: %s", resp.Status)
-	}
-
-	var preprocessResponse PreprocessResponse
-	if err := json.Unmarshal(respBody, &preprocessResponse); err != nil {
-		return nil, fmt.Errorf("failed to decode preprocess response: %w", err)
-	}
-
-	preprocessResponse.ViewLogURL = a.viewLogURL
-	return &preprocessResponse, nil
-}
-
 func (a *App) EnqueueJobs(preprocessId int, selectedInstances []Instance, unlisted bool) (string, error) {
 	log.Printf("[Go Backend] ENQUEUE: Queuing %d jobs for PreprocessID: %d unlisted=%v\n", len(selectedInstances), preprocessId, unlisted)
 
@@ -641,10 +564,7 @@ func (a *App) EnqueueJobs(preprocessId int, selectedInstances []Instance, unlist
 		return "", fmt.Errorf("failed to create enqueue request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	setNativeUploaderAPIHeaders(req)
-	if token := strings.TrimSpace(a.config.ApiToken); token != "" {
-		req.Header.Set("X-API-Token", token)
-	}
+	a.setAPIHeaders(req)
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
@@ -657,15 +577,10 @@ func (a *App) EnqueueJobs(preprocessId int, selectedInstances []Instance, unlist
 	log.Printf("[Go Backend] ENQUEUE Response: Status: %s\n", resp.Status)
 
 	if resp.StatusCode != http.StatusAccepted {
-		var parsed struct {
-			Message string `json:"message"`
-		}
-		_ = json.Unmarshal(respBody, &parsed)
-		if strings.TrimSpace(parsed.Message) != "" {
-			return "", fmt.Errorf("%s", parsed.Message)
-		}
-		return "", fmt.Errorf("server returned %s: %s", resp.Status, strings.TrimSpace(string(respBody)))
+		return "", newAPIError(resp.StatusCode, resp.Status, respBody)
 	}
+
+	a.recordUploadStarted(preprocessId, selectedInstances, unlisted)
 
 	anyPrivate := false
 	for _, inst := range selectedInstances {
@@ -678,116 +593,6 @@ func (a *App) EnqueueJobs(preprocessId int, selectedInstances []Instance, unlist
 		return "Queued. Private slices are not ranked or listed — open them from My private logs on the website.", nil
 	}
 	return "Jobs successfully queued! You will be notified upon completion.", nil
-}
-
-func (a *App) StartMonitoringJob(preprocessId int) {
-	a.startJobMonitor(preprocessId, nil, "")
-}
-
-// StartMonitoringJobWithTailRefresh polls job status and advances the auto-upload tail baseline on success.
-func (a *App) StartMonitoringJobWithTailRefresh(preprocessId int, logDirectory string) {
-	logPath := ""
-	if strings.TrimSpace(logDirectory) != "" {
-		logPath = combatLogPath(logDirectory)
-	}
-	a.startJobMonitor(preprocessId, nil, logPath)
-}
-
-func (a *App) startJobMonitor(preprocessId int, autoCtx *autoUploadJobContext, tailRefreshLogPath string) {
-	a.pollLock.Lock()
-	if a.pendingPolls[preprocessId] {
-		log.Printf("[Go Backend] POLLING: Monitoring for PreprocessID %d is already active.", preprocessId)
-		a.pollLock.Unlock()
-		return
-	}
-	a.pendingPolls[preprocessId] = true
-	a.pollLock.Unlock()
-
-	log.Printf("[Go Backend] POLLING: Started monitoring for PreprocessID: %d\n", preprocessId)
-
-	go func() {
-		defer func() {
-			a.pollLock.Lock()
-			delete(a.pendingPolls, preprocessId)
-			a.pollLock.Unlock()
-			log.Printf("[Go Backend] POLLING: Stopped monitoring for PreprocessID: %d\n", preprocessId)
-		}()
-
-		timeout := time.After(15 * time.Minute)
-		ticker := time.NewTicker(10 * time.Second)
-		defer ticker.Stop()
-
-		notifiedLogs := make(map[int]bool)
-		anyUploaded := false
-
-		for {
-			select {
-			case <-timeout:
-				log.Printf("[Go Backend] POLLING: Timed out for PreprocessID: %d\n", preprocessId)
-				if autoCtx != nil {
-					a.handleAutoUploadJobsFinished(autoCtx, anyUploaded)
-				}
-				return
-			case <-ticker.C:
-				status, err := a.checkJobStatus(preprocessId)
-				if err != nil {
-					log.Printf("[Go Backend] POLLING: Error checking status for %d: %v\n", preprocessId, err)
-					continue
-				}
-
-				allJobsConsideredDone := status.TotalJobs > 0 && status.JobsCompleted >= status.TotalJobs
-
-				for _, logStatus := range status.Logs {
-					if !notifiedLogs[logStatus.ID] && (logStatus.Status == "uploaded" || logStatus.Status == "failed") {
-						log.Printf("[Go Backend] POLLING: Detected completed log %d with status '%s'. Notifying frontend.\n", logStatus.ID, logStatus.Status)
-						if logStatus.Status == "uploaded" {
-							anyUploaded = true
-						}
-						runtime.EventsEmit(a.ctx, "job_notification", map[string]interface{}{
-							"logId":      logStatus.ID,
-							"status":     logStatus.Status,
-							"viewLogURL": status.ViewLogURL,
-						})
-						notifiedLogs[logStatus.ID] = true
-					}
-				}
-
-				if allJobsConsideredDone && len(notifiedLogs) == status.TotalJobs {
-					log.Printf("[Go Backend] POLLING: All %d jobs for PreprocessID %d are complete. Stopping poll.\n", status.TotalJobs, preprocessId)
-					if autoCtx != nil {
-						a.handleAutoUploadJobsFinished(autoCtx, anyUploaded)
-					} else if anyUploaded && tailRefreshLogPath != "" {
-						if err := a.advanceTailFingerprintFromLog(tailRefreshLogPath); err != nil {
-							log.Printf("[Go Backend] Could not refresh tail after manual upload: %v\n", err)
-						}
-					}
-					return
-				}
-			}
-		}
-	}()
-}
-
-func (a *App) checkJobStatus(preprocessId int) (*JobStatusResponse, error) {
-	apiURL := fmt.Sprintf("%s/api/v5/uploader/status/%d", a.apiBaseURL, preprocessId)
-
-	resp, err := http.Get(apiURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to poll for job status: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("polling returned non-200 status: %s", resp.Status)
-	}
-
-	var statusResponse JobStatusResponse
-	if err := json.NewDecoder(resp.Body).Decode(&statusResponse); err != nil {
-		return nil, fmt.Errorf("failed to decode job status response: %w", err)
-	}
-
-	statusResponse.ViewLogURL = a.viewLogURL
-	return &statusResponse, nil
 }
 
 func (a *App) GetUploaderServers() []UploaderServer {
@@ -1725,6 +1530,14 @@ func (a *App) FetchRosterCharacterRankingsJSON(rosterExportJSON string, filtersJ
 
 // CommitRaidPartyRankingsJSON merges roster rankings into the last addon payload and writes RankingsPayload.lua.
 func (a *App) CommitRaidPartyRankingsJSON(apiResponseJSON string, raidName string) (string, error) {
+	result, err := a.commitRaidPartyRankings(apiResponseJSON, raidName)
+	if err == nil {
+		a.recordAddonSync(AddonDatasetSync{Dataset: "raidParty", Label: "Raid / Party: " + raidName, Rows: countJSONRows(apiResponseJSON)})
+	}
+	return result, err
+}
+
+func (a *App) commitRaidPartyRankings(apiResponseJSON string, raidName string) (string, error) {
 	var api rosterCharacterRankingsAPIResponse
 	if err := json.Unmarshal([]byte(apiResponseJSON), &api); err != nil {
 		return "", fmt.Errorf("invalid roster rankings response: %w", err)
@@ -1986,6 +1799,14 @@ func (a *App) FetchGuildCharacterRankingsJSON(guildID int, filtersJSON string) (
 
 // CommitGuildRankingsJSON merges guild rankings into RankingsPayload.lua.
 func (a *App) CommitGuildRankingsJSON(apiResponseJSON string, guildName string, raidName string) (string, error) {
+	result, err := a.commitGuildRankings(apiResponseJSON, guildName, raidName)
+	if err == nil {
+		a.recordAddonSync(AddonDatasetSync{Dataset: "guild", Label: "Guild: " + guildName, Rows: countJSONRows(apiResponseJSON)})
+	}
+	return result, err
+}
+
+func (a *App) commitGuildRankings(apiResponseJSON string, guildName string, raidName string) (string, error) {
 	var api guildCharacterRankingsAPIResponse
 	if err := json.Unmarshal([]byte(apiResponseJSON), &api); err != nil {
 		return "", fmt.Errorf("invalid guild rankings response: %w", err)
@@ -2140,10 +1961,7 @@ func (a *App) fetchAddonRankingsFullQuery(q url.Values) ([]byte, error) {
 		return nil, fmt.Errorf("failed to create rankings request: %w", err)
 	}
 
-	apiToken := strings.TrimSpace(a.config.ApiToken)
-	if apiToken != "" {
-		req.Header.Set("X-API-Token", apiToken)
-	}
+	a.setAPIHeaders(req)
 	setNativeUploaderAPIHeaders(req)
 
 	resp, err := client.Do(req)
@@ -2191,25 +2009,43 @@ func (a *App) BrowseAddonRankingsJSON(serverName string, season int, extraQueryJ
 
 // CommitAddonRankingsJSON writes src/RankingsPayload.lua under the WowLogs addon folder from JSON.
 func (a *App) CommitAddonRankingsJSON(jsonPayload string) (string, error) {
-	return a.commitAddonRankingsResponseBody([]byte(jsonPayload))
+	result, err := a.commitAddonRankingsResponseBody([]byte(jsonPayload))
+	if err == nil {
+		a.recordAddonSync(leaderboardSyncRecord([]byte(jsonPayload)))
+	}
+	return result, err
 }
 
-func (a *App) UpdateAddonRankings(serverName string, season int) (string, error) {
-	if strings.TrimSpace(serverName) == "" {
-		return "", fmt.Errorf("server is required")
+func leaderboardSyncRecord(payload []byte) AddonDatasetSync {
+	var parsed struct {
+		Realm            string `json:"realm"`
+		Season           int    `json:"season"`
+		PointsCount      int    `json:"pointsCount"`
+		PerformanceCount int    `json:"performanceCount"`
 	}
-	q := url.Values{}
-	q.Set("serverName", strings.TrimSpace(serverName))
-	q.Set("syncMode", "full")
-	if season > 0 {
-		q.Set("season", fmt.Sprintf("%d", season))
+	_ = json.Unmarshal(payload, &parsed)
+	return AddonDatasetSync{
+		Dataset: "leaderboard",
+		Label:   "Leaderboard",
+		Rows:    parsed.PointsCount + parsed.PerformanceCount,
+		Realm:   parsed.Realm,
+		Season:  parsed.Season,
 	}
+}
 
-	body, err := a.fetchAddonRankingsFullQuery(q)
-	if err != nil {
-		return "", err
+// countJSONRows counts the entries of a response's players, rows or characters list.
+func countJSONRows(payload string) int {
+	var parsed map[string]json.RawMessage
+	if json.Unmarshal([]byte(payload), &parsed) != nil {
+		return 0
 	}
-	return a.commitAddonRankingsResponseBody(body)
+	for _, key := range []string{"players", "rows", "characters", "members"} {
+		var list []json.RawMessage
+		if raw, ok := parsed[key]; ok && json.Unmarshal(raw, &list) == nil {
+			return len(list)
+		}
+	}
+	return 0
 }
 
 // GetPremiumConfig returns current premium settings (token type, token, and followed players)

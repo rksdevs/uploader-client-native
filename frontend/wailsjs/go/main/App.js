@@ -6,6 +6,10 @@ export function AbandonAutoUploadInstanceSelection() {
   return window['go']['main']['App']['AbandonAutoUploadInstanceSelection']();
 }
 
+export function ArchiveCombatLog(arg1) {
+  return window['go']['main']['App']['ArchiveCombatLog'](arg1);
+}
+
 export function BrowseAddonRankingsJSON(arg1, arg2, arg3) {
   return window['go']['main']['App']['BrowseAddonRankingsJSON'](arg1, arg2, arg3);
 }
@@ -14,8 +18,16 @@ export function CancelAutoUploadServerDrift() {
   return window['go']['main']['App']['CancelAutoUploadServerDrift']();
 }
 
+export function CancelSignIn() {
+  return window['go']['main']['App']['CancelSignIn']();
+}
+
 export function CheckAutoUploadPremiumNow() {
   return window['go']['main']['App']['CheckAutoUploadPremiumNow']();
+}
+
+export function CheckForUpdate() {
+  return window['go']['main']['App']['CheckForUpdate']();
 }
 
 export function CommitAddonRankingsJSON(arg1) {
@@ -74,6 +86,14 @@ export function FetchRosterCharacterRankingsJSON(arg1, arg2) {
   return window['go']['main']['App']['FetchRosterCharacterRankingsJSON'](arg1, arg2);
 }
 
+export function GetAccount() {
+  return window['go']['main']['App']['GetAccount']();
+}
+
+export function GetAddonStatus() {
+  return window['go']['main']['App']['GetAddonStatus']();
+}
+
 export function GetApiBaseURL() {
   return window['go']['main']['App']['GetApiBaseURL']();
 }
@@ -90,6 +110,10 @@ export function GetAutoUploadWatcherStatus() {
   return window['go']['main']['App']['GetAutoUploadWatcherStatus']();
 }
 
+export function GetDesktopSettings() {
+  return window['go']['main']['App']['GetDesktopSettings']();
+}
+
 export function GetDiagnosticLogPath() {
   return window['go']['main']['App']['GetDiagnosticLogPath']();
 }
@@ -102,12 +126,28 @@ export function GetPremiumConfig() {
   return window['go']['main']['App']['GetPremiumConfig']();
 }
 
+export function GetRecentLogLines(arg1, arg2) {
+  return window['go']['main']['App']['GetRecentLogLines'](arg1, arg2);
+}
+
 export function GetSavedDirectory() {
   return window['go']['main']['App']['GetSavedDirectory']();
 }
 
+export function GetSiteURL() {
+  return window['go']['main']['App']['GetSiteURL']();
+}
+
 export function GetTheme() {
   return window['go']['main']['App']['GetTheme']();
+}
+
+export function GetUploadHistory() {
+  return window['go']['main']['App']['GetUploadHistory']();
+}
+
+export function GetUploadPreview(arg1, arg2) {
+  return window['go']['main']['App']['GetUploadPreview'](arg1, arg2);
 }
 
 export function GetUploaderServers() {
@@ -118,6 +158,10 @@ export function GetWowDirectory() {
   return window['go']['main']['App']['GetWowDirectory']();
 }
 
+export function InstallUpdate() {
+  return window['go']['main']['App']['InstallUpdate']();
+}
+
 export function IsServerAllowedForAutoUpload(arg1) {
   return window['go']['main']['App']['IsServerAllowedForAutoUpload'](arg1);
 }
@@ -126,8 +170,16 @@ export function LogClientMessage(arg1, arg2) {
   return window['go']['main']['App']['LogClientMessage'](arg1, arg2);
 }
 
+export function MergeAndUpload(arg1, arg2, arg3) {
+  return window['go']['main']['App']['MergeAndUpload'](arg1, arg2, arg3);
+}
+
 export function OpenAllLogsPage() {
   return window['go']['main']['App']['OpenAllLogsPage']();
+}
+
+export function OpenDiagnosticLog() {
+  return window['go']['main']['App']['OpenDiagnosticLog']();
 }
 
 export function OpenLogPage(arg1) {
@@ -138,8 +190,8 @@ export function PrepareAutoUploadStagingNow() {
   return window['go']['main']['App']['PrepareAutoUploadStagingNow']();
 }
 
-export function PreprocessLog(arg1, arg2, arg3) {
-  return window['go']['main']['App']['PreprocessLog'](arg1, arg2, arg3);
+export function ReopenSignInPage() {
+  return window['go']['main']['App']['ReopenSignInPage']();
 }
 
 export function ResolveAutoUploadServerDrift(arg1) {
@@ -154,24 +206,52 @@ export function SaveDefaultServer(arg1) {
   return window['go']['main']['App']['SaveDefaultServer'](arg1);
 }
 
+export function SaveMergedFile(arg1) {
+  return window['go']['main']['App']['SaveMergedFile'](arg1);
+}
+
 export function SavePremiumConfig(arg1, arg2, arg3) {
   return window['go']['main']['App']['SavePremiumConfig'](arg1, arg2, arg3);
+}
+
+export function ScanMergeFiles(arg1) {
+  return window['go']['main']['App']['ScanMergeFiles'](arg1);
+}
+
+export function SelectCombatLogFile() {
+  return window['go']['main']['App']['SelectCombatLogFile']();
 }
 
 export function SelectDirectory() {
   return window['go']['main']['App']['SelectDirectory']();
 }
 
+export function SelectMergeFiles() {
+  return window['go']['main']['App']['SelectMergeFiles']();
+}
+
 export function SelectWowDirectory() {
   return window['go']['main']['App']['SelectWowDirectory']();
+}
+
+export function SetDesktopNotifications(arg1) {
+  return window['go']['main']['App']['SetDesktopNotifications'](arg1);
 }
 
 export function SetMinimizeToTray(arg1) {
   return window['go']['main']['App']['SetMinimizeToTray'](arg1);
 }
 
+export function SetStartWithWindows(arg1) {
+  return window['go']['main']['App']['SetStartWithWindows'](arg1);
+}
+
 export function SetTheme(arg1) {
   return window['go']['main']['App']['SetTheme'](arg1);
+}
+
+export function SignOut() {
+  return window['go']['main']['App']['SignOut']();
 }
 
 export function StartMonitoringJob(arg1) {
@@ -182,6 +262,10 @@ export function StartMonitoringJobWithTailRefresh(arg1, arg2) {
   return window['go']['main']['App']['StartMonitoringJobWithTailRefresh'](arg1, arg2);
 }
 
-export function UpdateAddonRankings(arg1, arg2) {
-  return window['go']['main']['App']['UpdateAddonRankings'](arg1, arg2);
+export function StartSignIn() {
+  return window['go']['main']['App']['StartSignIn']();
+}
+
+export function UploadLog(arg1) {
+  return window['go']['main']['App']['UploadLog'](arg1);
 }

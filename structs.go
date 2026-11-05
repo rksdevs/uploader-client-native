@@ -9,6 +9,12 @@ type PreprocessResponse struct {
 	ViewLogURL                 string     `json:"viewLogURL"`
 }
 
+// uploadSource remembers how an upload started until its jobs are queued.
+type uploadSource struct {
+	Source     string
+	ServerName string
+}
+
 type Instance struct {
 	Name               string           `json:"name"`
 	EncounterStartTime string           `json:"encounterStartTime"`
@@ -34,6 +40,7 @@ type InstancePreview struct {
 type JobStatusResponse struct {
 	TotalJobs     int         `json:"totalJobs"`
 	JobsCompleted int         `json:"jobsCompleted"`
+	QueuePosition *int        `json:"queuePosition"`
 	Logs          []LogStatus `json:"logs"`
 	ViewLogURL    string      `json:"viewLogURL"`
 }

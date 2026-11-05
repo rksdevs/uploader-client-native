@@ -28,7 +28,7 @@ type autoUploadVerifyResponse struct {
 }
 
 func (a *App) verifyAutoUploadAccessRemote() (ok bool, message string, err error) {
-	token := strings.TrimSpace(a.config.ApiToken)
+	token := a.authToken()
 	if token == "" {
 		return false, "Premium API token is missing.", nil
 	}
@@ -38,7 +38,7 @@ func (a *App) verifyAutoUploadAccessRemote() (ok bool, message string, err error
 	if err != nil {
 		return false, "", err
 	}
-	req.Header.Set("X-API-Token", token)
+	a.setAPIHeaders(req)
 	req.Header.Set("X-Device-Id", a.ensureDeviceID())
 
 	client := &http.Client{Timeout: 20 * time.Second}
@@ -106,7 +106,7 @@ func (a *App) shouldRecheckAutoUploadPremium() bool {
 // ensureAutoUploadPremiumActive verifies remote premium access.
 // Network failures fail open (returns true) so brief outages do not disable auto-upload.
 func (a *App) ensureAutoUploadPremiumActive() bool {
-	if strings.TrimSpace(a.config.ApiToken) == "" {
+	if a.authToken() == "" {
 		a.disableAutoUploadForPremiumLoss("Premium API token is missing.")
 		return false
 	}

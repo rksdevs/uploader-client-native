@@ -1,14 +1,20 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type autoUploadJobContext struct {
+	PreprocessID  int
 	SourceLogPath string
 	StagingPath   string
 	SplitOffset   int64
@@ -70,26 +76,12 @@ func (a *App) continueStagedAutoUpload(serverName, stagingPath, sourceLogPath st
 		})
 	}
 
-	zipBytes, err := zipStagingCombatLog(stagingPath)
+	resp, err := a.uploadStagedAutoLog(serverName, stagingPath)
 	if err != nil {
-		log.Printf("[AutoUpload] Zip failed: %v\n", err)
-		a.setWatcherStatus("error", fmt.Sprintf("Could not zip staging file: %v", err))
-		a.resetStagedOffsetForRetry()
-		a.clearAutoUploadInFlight()
-		if a.ctx != nil {
-			runtime.EventsEmit(a.ctx, "auto_upload_error", map[string]interface{}{"message": err.Error()})
-		}
-		return
-	}
-
-	a.setWatcherStatus("uploading", fmt.Sprintf("Uploading %s for preprocessing…", formatBytes(int64(len(zipBytes)))))
-	resp, statusCode, respBody, err := a.postAutoPreprocess(zipBytes, serverName)
-	if err != nil {
-		apiErr := parseAPIErrorBody(respBody)
-		code := apiErr.Code
-		message := apiErr.Message
-		if message == "" {
-			message = err.Error()
+		code, statusCode, message := "", 0, err.Error()
+		var apiErr *apiError
+		if errors.As(err, &apiErr) {
+			code, statusCode = apiErr.Code, apiErr.Status
 		}
 
 		log.Printf("[AutoUpload] auto-preprocess failed (status=%d code=%s): %s\n", statusCode, code, message)
@@ -101,6 +93,16 @@ func (a *App) continueStagedAutoUpload(serverName, stagingPath, sourceLogPath st
 			} else {
 				removeStagingFile(stagingPath)
 			}
+			a.recordHistory(HistoryEntry{
+				Source:     historySourceAuto,
+				ServerName: serverName,
+				StartedAt:  time.Now().UTC().Format(time.RFC3339),
+				Status:     historySkipped,
+				Message:    message,
+				Raids:      []string{},
+				Bosses:     []string{},
+				LogIDs:     []int{},
+			})
 			a.setWatcherStatus("watching", "No raid bosses in new log slice — skipped.")
 			a.clearAutoUploadInFlight()
 			if a.ctx != nil {
@@ -153,6 +155,7 @@ func (a *App) continueStagedAutoUpload(serverName, stagingPath, sourceLogPath st
 	}
 
 	autoCtx := &autoUploadJobContext{
+		PreprocessID:  resp.PreprocessID,
 		SourceLogPath: sourceLogPath,
 		StagingPath:   stagingPath,
 		SplitOffset:   splitOffset,
@@ -190,24 +193,117 @@ func (a *App) continueStagedAutoUpload(serverName, stagingPath, sourceLogPath st
 	}
 }
 
-func (a *App) handleAutoUploadJobsFinished(autoCtx *autoUploadJobContext, anyUploaded bool) {
+func (a *App) uploadStagedAutoLog(serverName, stagingPath string) (*PreprocessResponse, error) {
+	file, err := os.Open(stagingPath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	a.setWatcherStatus("uploading", fmt.Sprintf("Uploading %s for preprocessing…", formatBytes(info.Size())))
+	return a.uploadCombatLog(file, info.Size(), preprocessUploadOptions{
+		Endpoint:   "/api/v5/uploader/auto-preprocess",
+		ServerName: serverName,
+		Source:     historySourceAuto,
+		Prepare: func(req *http.Request) {
+			req.Header.Set("X-Device-Id", a.ensureDeviceID())
+		},
+	})
+}
+
+func (a *App) rememberPendingAutoUpload(preprocessID int, autoCtx *autoUploadJobContext) {
+	state, err := a.loadTailState()
+	if err != nil {
+		log.Printf("[AutoUpload] Could not load tail state: %v\n", err)
+		return
+	}
+	state.PendingPreprocessID = preprocessID
+	state.PendingStagingPath = autoCtx.StagingPath
+	state.PendingSourcePath = autoCtx.SourceLogPath
+	if err := a.saveTailState(state); err != nil {
+		log.Printf("[AutoUpload] Could not remember pending upload: %v\n", err)
+	}
+}
+
+func (a *App) clearPendingAutoUpload() {
+	state, err := a.loadTailState()
+	if err != nil {
+		return
+	}
+	state.PendingPreprocessID = 0
+	state.PendingStagingPath = ""
+	state.PendingSourcePath = ""
+	if err := a.saveTailState(state); err != nil {
+		log.Printf("[AutoUpload] Could not clear pending upload: %v\n", err)
+	}
+}
+
+// resumePendingAutoUpload picks up jobs left running when the app closed, so a finished upload
+// still advances the tail instead of being staged and uploaded a second time.
+func (a *App) resumePendingAutoUpload() {
+	state, err := a.loadTailState()
+	if err != nil || state.PendingPreprocessID == 0 {
+		return
+	}
+	a.autoUploadMu.Lock()
+	a.autoUploadUploading = true
+	a.autoUploadMu.Unlock()
+	log.Printf("[AutoUpload] Resuming job monitor for preprocessId=%d\n", state.PendingPreprocessID)
+	a.startJobMonitor(state.PendingPreprocessID, &autoUploadJobContext{
+		PreprocessID:  state.PendingPreprocessID,
+		SourceLogPath: state.PendingSourcePath,
+		StagingPath:   state.PendingStagingPath,
+	}, "")
+}
+
+// keepStagingForRetry moves the slice out of the staging name the watcher reuses.
+func keepStagingForRetry(stagingPath string, preprocessID int) (string, error) {
+	retryPath := filepath.Join(filepath.Dir(stagingPath), fmt.Sprintf("retry-%d.txt", preprocessID))
+	if err := os.Rename(stagingPath, retryPath); err != nil {
+		return "", err
+	}
+	return retryPath, nil
+}
+
+func (a *App) handleAutoUploadJobsFinished(autoCtx *autoUploadJobContext, outcome jobOutcome) {
 	if autoCtx == nil {
 		return
 	}
 	defer a.clearAutoUploadInFlight()
-	if anyUploaded {
+
+	switch outcome {
+	case jobOutcomeAllUploaded, jobOutcomePartial:
+		a.clearPendingAutoUpload()
 		if err := a.advanceTailFingerprintFromLog(autoCtx.SourceLogPath); err != nil {
 			log.Printf("[AutoUpload] Could not advance tail after upload: %v\n", err)
 		}
-		removeStagingFile(autoCtx.StagingPath)
-		a.setWatcherStatus("watching", "Auto-upload complete — tail baseline advanced.")
+		if outcome == jobOutcomeAllUploaded {
+			removeStagingFile(autoCtx.StagingPath)
+			a.setWatcherStatus("watching", "Auto-upload complete — tail baseline advanced.")
+		} else {
+			// Retrying the whole slice is safe: the server drops raids it already has.
+			retryPath, err := keepStagingForRetry(autoCtx.StagingPath, autoCtx.PreprocessID)
+			if err != nil {
+				log.Printf("[AutoUpload] Could not keep failed slice: %v\n", err)
+			} else {
+				a.setHistoryRetryPath(autoCtx.PreprocessID, retryPath)
+			}
+			a.setWatcherStatus("watching", "Some raids failed to process — retry them from upload history.")
+		}
 		if a.ctx != nil {
 			runtime.EventsEmit(a.ctx, "auto_upload_complete", map[string]interface{}{})
 		}
-		return
+	case jobOutcomeTimedOut:
+		// Not a failure: staging, tail and pending state stay so the next start resumes watching.
+		a.setWatcherStatus("error", "Upload is still in the server queue — it will be checked again when the app restarts.")
+	default:
+		a.clearPendingAutoUpload()
+		a.setWatcherStatus("error", "Auto-upload jobs failed — staging copy kept for retry.")
+		a.resetStagedOffsetForRetry()
 	}
-	a.setWatcherStatus("error", "Auto-upload jobs failed — staging copy kept for retry.")
-	a.resetStagedOffsetForRetry()
 }
 
 // AbandonAutoUploadInstanceSelection releases the upload lock when the user cancels instance picking.
@@ -224,6 +320,7 @@ func (a *App) EnqueueAutoUploadJobs(preprocessId int, selectedInstances []Instan
 		return result, err
 	}
 	autoCtx := &autoUploadJobContext{
+		PreprocessID:  preprocessId,
 		SourceLogPath: sourceLogPath,
 		StagingPath:   stagingPath,
 	}

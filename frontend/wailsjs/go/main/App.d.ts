@@ -4,11 +4,17 @@ import {main} from '../models';
 
 export function AbandonAutoUploadInstanceSelection():Promise<void>;
 
+export function ArchiveCombatLog(arg1:string):Promise<string>;
+
 export function BrowseAddonRankingsJSON(arg1:string,arg2:number,arg3:string):Promise<string>;
 
 export function CancelAutoUploadServerDrift():Promise<void>;
 
+export function CancelSignIn():Promise<void>;
+
 export function CheckAutoUploadPremiumNow():Promise<boolean|string>;
+
+export function CheckForUpdate():Promise<main.UpdateInfo>;
 
 export function CommitAddonRankingsJSON(arg1:string):Promise<string>;
 
@@ -38,6 +44,10 @@ export function FetchLeaderboardSeasonsConfigJSON():Promise<string>;
 
 export function FetchRosterCharacterRankingsJSON(arg1:string,arg2:string):Promise<string>;
 
+export function GetAccount():Promise<main.DesktopAccount>;
+
+export function GetAddonStatus():Promise<main.AddonStatus>;
+
 export function GetApiBaseURL():Promise<string>;
 
 export function GetAppVersion():Promise<string>;
@@ -46,31 +56,47 @@ export function GetAutoUploadSettings():Promise<main.AutoUploadSettingsResponse>
 
 export function GetAutoUploadWatcherStatus():Promise<main.AutoUploadWatcherStatus>;
 
+export function GetDesktopSettings():Promise<main.DesktopSettings>;
+
 export function GetDiagnosticLogPath():Promise<string>;
 
 export function GetMinimizeToTray():Promise<boolean>;
 
 export function GetPremiumConfig():Promise<Record<string, string>>;
 
+export function GetRecentLogLines(arg1:string,arg2:number):Promise<Array<string>>;
+
 export function GetSavedDirectory():Promise<string>;
 
+export function GetSiteURL():Promise<string>;
+
 export function GetTheme():Promise<string>;
+
+export function GetUploadHistory():Promise<Array<main.HistoryEntry>>;
+
+export function GetUploadPreview(arg1:string,arg2:string):Promise<main.UploadPreview>;
 
 export function GetUploaderServers():Promise<Array<main.UploaderServer>>;
 
 export function GetWowDirectory():Promise<string>;
 
+export function InstallUpdate():Promise<void>;
+
 export function IsServerAllowedForAutoUpload(arg1:string):Promise<boolean>;
 
 export function LogClientMessage(arg1:string,arg2:string):Promise<void>;
 
+export function MergeAndUpload(arg1:Array<string>,arg2:string,arg3:boolean):Promise<main.PreprocessResponse>;
+
 export function OpenAllLogsPage():Promise<void>;
+
+export function OpenDiagnosticLog():Promise<void>;
 
 export function OpenLogPage(arg1:number):Promise<void>;
 
 export function PrepareAutoUploadStagingNow():Promise<main.AutoUploadWatcherStatus>;
 
-export function PreprocessLog(arg1:string,arg2:string,arg3:boolean):Promise<main.PreprocessResponse>;
+export function ReopenSignInPage():Promise<void>;
 
 export function ResolveAutoUploadServerDrift(arg1:string):Promise<void>;
 
@@ -78,18 +104,34 @@ export function ResumeAutoUpload():Promise<void>;
 
 export function SaveDefaultServer(arg1:string):Promise<void>;
 
+export function SaveMergedFile(arg1:Array<string>):Promise<string>;
+
 export function SavePremiumConfig(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function ScanMergeFiles(arg1:Array<string>):Promise<main.MergePlan>;
+
+export function SelectCombatLogFile():Promise<string>;
 
 export function SelectDirectory():Promise<string>;
 
+export function SelectMergeFiles():Promise<Array<string>>;
+
 export function SelectWowDirectory():Promise<string>;
+
+export function SetDesktopNotifications(arg1:boolean):Promise<void>;
 
 export function SetMinimizeToTray(arg1:boolean):Promise<void>;
 
+export function SetStartWithWindows(arg1:boolean):Promise<void>;
+
 export function SetTheme(arg1:string):Promise<void>;
+
+export function SignOut():Promise<void>;
 
 export function StartMonitoringJob(arg1:number):Promise<void>;
 
 export function StartMonitoringJobWithTailRefresh(arg1:number,arg2:string):Promise<void>;
 
-export function UpdateAddonRankings(arg1:string,arg2:number):Promise<string>;
+export function StartSignIn():Promise<main.DesktopAccount>;
+
+export function UploadLog(arg1:main.UploadRequest):Promise<main.PreprocessResponse>;

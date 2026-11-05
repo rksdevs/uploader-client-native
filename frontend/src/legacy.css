@@ -1,77 +1,40 @@
+/*
+ * Rankings browsers, instance picker and dialogs kept from 3.x. Their colours resolve to the
+ * design tokens in index.css, so both themes follow the rest of the app.
+ */
 :root {
-  --bg-root: #f5f7fb;
-  --bg-card: #ffffff;
-  --bg-panel: #f0f5ff;
-  --bg-panel-border: #bfdbfe;
-  --bg-panel-info: #dbeafe;
-  --text-primary: #111827;
-  --text-muted: #4b5563;
-  --text-info: #1e40af;
-  --border-soft: #dbe3f0;
-  --brand: #2563eb;
-  --brand-hover: #1d4ed8;
-  --success: #059669;
-  --success-hover: #047857;
-  --neutral-btn: #111827;
-  --neutral-btn-hover: #1f2937;
-  --neutral-btn-text: #ffffff;
-  --bg-input: #ffffff;
-  --header-grad: linear-gradient(180deg, #eef3ff 0%, #f8fafc 100%);
-  --text-link: #4338ca;
-  --text-link-hover: #312e81;
-  --modal-overlay: rgba(0, 0, 0, 0.45);
-  --modal-bg: #ffffff;
-  --modal-border: #e2e8f0;
-  --modal-footer-bg: #f8fafc;
-  --toggle-bg: #111827;
-  --toggle-border: #1f2937;
-  --toggle-text: #ffffff;
-  --btn-sec-bg: #ffffff;
-  --btn-sec-border: #d1d5db;
-  --btn-sec-text: #111827;
-  --btn-sec-hover: #f9fafb;
-  --bg-panel-success: #f0fdf4;
-  --border-success-soft: #bbf7d0;
-  --instance-hover-bg: #f3f4f6;
-  --instance-hover-border: #cbd5e1;
-}
-
-.dark-theme {
-  --bg-root: #0f172a;
-  --bg-card: #1e293b;
-  --bg-panel: #334155;
-  --bg-panel-border: #475569;
-  --bg-panel-info: #1e293b;
-  --text-primary: #f8fafc;
-  --text-muted: #94a3b8;
-  --text-info: #bfdbfe;
-  --border-soft: #334155;
-  --brand: #6366f1;
-  --brand-hover: #818cf8;
-  --success: #10b981;
-  --success-hover: #34d399;
-  --neutral-btn: #475569;
-  --neutral-btn-hover: #334155;
-  --neutral-btn-text: #f8fafc;
-  --bg-input: #0f172a;
-  --header-grad: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
-  --text-link: #a5b4fc;
-  --text-link-hover: #c7d2fe;
-  --modal-overlay: rgba(0, 0, 0, 0.7);
-  --modal-bg: #1e293b;
-  --modal-border: #334155;
-  --modal-footer-bg: #0f172a;
-  --toggle-bg: #475569;
-  --toggle-border: #64748b;
-  --toggle-text: #f8fafc;
-  --btn-sec-bg: #1e293b;
-  --btn-sec-border: #475569;
-  --btn-sec-text: #e2e8f0;
-  --btn-sec-hover: #334155;
-  --bg-panel-success: #064e3b;
-  --border-success-soft: #047857;
-  --instance-hover-bg: #273449;
-  --instance-hover-border: #4b5f7a;
+  --bg-root: var(--background);
+  --bg-card: var(--card);
+  --bg-panel: var(--muted);
+  --bg-panel-border: var(--border);
+  --bg-panel-info: var(--accent);
+  --text-primary: var(--foreground);
+  --text-muted: var(--muted-foreground);
+  --text-info: var(--foreground);
+  --border-soft: var(--border);
+  --success-hover: var(--success);
+  --neutral-btn: var(--muted);
+  --neutral-btn-hover: var(--accent);
+  --neutral-btn-text: var(--foreground);
+  --bg-input: var(--input);
+  --header-grad: none;
+  --text-link: var(--brand-text);
+  --text-link-hover: var(--brand-text);
+  --modal-overlay: rgba(0, 0, 0, 0.6);
+  --modal-bg: var(--card);
+  --modal-border: var(--border);
+  --modal-footer-bg: var(--muted);
+  --toggle-bg: var(--muted);
+  --toggle-border: var(--border);
+  --toggle-text: var(--foreground);
+  --btn-sec-bg: var(--card);
+  --btn-sec-border: var(--border);
+  --btn-sec-text: var(--foreground);
+  --btn-sec-hover: var(--muted);
+  --bg-panel-success: var(--muted);
+  --border-success-soft: var(--border);
+  --instance-hover-bg: var(--muted);
+  --instance-hover-border: var(--border);
 }
 .container {
   max-width: 920px;
@@ -232,21 +195,21 @@ h1 {
 }
 
 .input-like-select:hover {
-  border-color: #a855f7;
+  border-color: var(--brand-text);
 }
 
 .dark-theme .input-like-select:hover {
-  border-color: #c084fc;
+  border-color: var(--brand-text);
 }
 
 .input-like-select:focus {
   outline: none;
-  border-color: #9333ea;
-  box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.2);
+  border-color: var(--brand-text);
+  box-shadow: 0 0 0 3px rgba(0, 130, 154, 0.2);
 }
 
 .dark-theme .input-like-select:focus {
-  border-color: #c084fc;
+  border-color: var(--brand-text);
   box-shadow: 0 0 0 3px rgba(192, 132, 252, 0.2);
 }
 
@@ -753,12 +716,12 @@ h1 {
   align-items: center;
   justify-content: center;
   color: #fff;
-  background: linear-gradient(to bottom right, #a855f7, #4f46e5);
+  background: linear-gradient(to bottom right, var(--brand-text), var(--brand-text));
   box-shadow: 0 10px 25px rgba(168, 85, 247, 0.35);
 }
 
 .dark-theme .app-logo-tile {
-  background: linear-gradient(to bottom right, #9333ea, #4338ca);
+  background: linear-gradient(to bottom right, var(--brand-text), var(--brand-text));
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
 }
 
@@ -799,7 +762,7 @@ h1 {
 
 .theme-icon-btn:hover {
   background: var(--btn-sec-hover);
-  border-color: #a855f7;
+  border-color: var(--brand-text);
   transform: translateY(-1px);
 }
 
@@ -903,12 +866,12 @@ h1 {
 }
 
 .card-head-icon {
-  color: #9333ea;
+  color: var(--brand-text);
   flex-shrink: 0;
 }
 
 .dark-theme .card-head-icon {
-  color: #c084fc;
+  color: var(--brand-text);
 }
 
 .card-head-title {
@@ -924,7 +887,7 @@ h1 {
   border: none;
   padding: 0.2rem;
   cursor: pointer;
-  color: #6366f1;
+  color: var(--brand-text);
   border-radius: 0.25rem;
   line-height: 0;
   opacity: 0.75;
@@ -933,7 +896,7 @@ h1 {
 
 .help-icon-btn:hover {
   opacity: 1;
-  color: #4f46e5;
+  color: var(--brand-text);
 }
 
 .premium-chip-inline {
@@ -993,11 +956,11 @@ h1 {
   font-size: 0.65rem;
   font-weight: 700;
   color: #fff;
-  background: #9333ea;
+  background: var(--brand-text);
 }
 
 .dark-theme .step-badge {
-  background: #a855f7;
+  background: var(--brand-text);
 }
 
 .setup-step-body {
@@ -1039,7 +1002,7 @@ h1 {
 }
 
 .btn-outline-refresh:hover:not(:disabled) {
-  border-color: #a855f7;
+  border-color: var(--brand-text);
   background: var(--btn-sec-hover);
 }
 
@@ -1381,7 +1344,7 @@ h1 {
   border: none;
   border-radius: 0.5rem;
   cursor: pointer;
-  background: linear-gradient(to right, #9333ea, #4f46e5);
+  background: linear-gradient(to right, var(--brand-text), var(--brand-text));
   box-shadow: 0 8px 24px rgba(79, 70, 229, 0.35);
   transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
 }
@@ -1429,13 +1392,13 @@ h1 {
 }
 
 .btn-surface:hover:not(:disabled) {
-  border-color: #a855f7;
+  border-color: var(--brand-text);
   background: var(--btn-sec-hover);
   transform: translateY(-1px);
 }
 
 .dark-theme .btn-surface:hover:not(:disabled) {
-  border-color: #c084fc;
+  border-color: var(--brand-text);
 }
 
 .btn-surface:disabled {
@@ -1484,20 +1447,20 @@ h1 {
   font-weight: 600;
   border-radius: 0.5rem;
   border: 1px solid #c4b5fd;
-  background: #ede9fe;
-  color: #5b21b6;
+  background: var(--muted);
+  color: var(--foreground);
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .dark-theme .btn-send-addon {
-  border-color: #6d28d9;
+  border-color: var(--brand-text);
   background: rgba(91, 33, 182, 0.35);
-  color: #e9d5ff;
+  color: var(--foreground);
 }
 
 .btn-send-addon:hover:not(:disabled) {
-  background: #ddd6fe;
+  background: var(--muted);
 }
 
 .dark-theme .btn-send-addon:hover:not(:disabled) {
@@ -1521,7 +1484,7 @@ h1 {
 }
 
 .app-footer-links__a {
-  color: #9333ea;
+  color: var(--brand-text);
   font-size: 0.8125rem;
   font-weight: 600;
   text-decoration: underline;
@@ -1529,11 +1492,11 @@ h1 {
 }
 
 .dark-theme .app-footer-links__a {
-  color: #c084fc;
+  color: var(--brand-text);
 }
 
 .app-footer-links__a:hover {
-  color: #7e22ce;
+  color: var(--brand-text);
 }
 
 .instance-flow-card .instance-selector {
@@ -1584,14 +1547,14 @@ h1 {
 }
 
 .rankings-browser__link {
-  color: #9333ea;
+  color: var(--brand-text);
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
 .dark-theme .rankings-browser__link {
-  color: #c084fc;
+  color: var(--brand-text);
 }
 
 .rb-field__microcopy {
@@ -1979,7 +1942,7 @@ h1 {
 }
 
 .rankings-browser__table-wrap tbody tr:hover {
-  background: rgba(147, 51, 234, 0.04);
+  background: rgba(0, 130, 154, 0.04);
 }
 
 .dark-theme .rankings-browser__table-wrap tbody tr:hover {
@@ -2009,4 +1972,62 @@ h1 {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 3rem;
+}
+
+/* 4.0: flatten 3.x gradients and shadows to the tool look used by the new screens. */
+.redesign-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: none;
+}
+.btn-gradient,
+.btn-send {
+  background: var(--brand) !important;
+  background-image: none !important;
+  border-color: var(--brand) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+.btn-gradient:hover:not(:disabled),
+.btn-send:hover:not(:disabled) {
+  background: var(--brand-hover) !important;
+}
+.btn-slate {
+  background: var(--muted) !important;
+  background-image: none !important;
+  color: var(--foreground) !important;
+  box-shadow: none !important;
+}
+.btn-slate-solid,
+.dark-theme .btn-slate-solid {
+  background: var(--muted) !important;
+  color: var(--foreground) !important;
+  box-shadow: none !important;
+}
+.btn-slate-solid:hover:not(:disabled),
+.dark-theme .btn-slate-solid:hover:not(:disabled) {
+  background: var(--accent) !important;
+}
+.btn-send-addon,
+.dark-theme .btn-send-addon {
+  background: var(--brand) !important;
+  border-color: var(--brand) !important;
+  color: #fff !important;
+}
+.btn-send-addon:hover:not(:disabled),
+.dark-theme .btn-send-addon:hover:not(:disabled) {
+  background: var(--brand-hover) !important;
+}
+.rb-log-link {
+  background: none;
+  border: 0;
+  color: var(--brand-text);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 0;
+}
+.rb-log-link:hover {
+  text-decoration: underline;
 }

@@ -124,3 +124,80 @@ func TestParseWotLKLineTimestamp(t *testing.T) {
 		t.Fatalf("unexpected timestamp: %v", ts)
 	}
 }
+
+func TestFindTailSplitOffset_logClearedThenGrewPastOldOffset(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, combatLogFileName)
+	old := "3/15 20:00:01.123  SPELL_DAMAGE,old1\n3/15 20:00:02.123  SPELL_DAMAGE,old2\n"
+	fp, _, err := fingerprintFromBytes([]byte(old), 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Cleared in-game, then a raid longer than the old file.
+	fresh := strings.Repeat("3/22 20:00:01.123  SPELL_DAMAGE,fresh\n", 20)
+	if err := os.WriteFile(path, []byte(fresh), 0644); err != nil {
+		t.Fatal(err)
+	}
+	split, err := findTailSplitOffset(path, TailState{
+		TailFingerprint: fp,
+		LastByteOffset:  int64(len(old)),
+		SourceFileSize:  int64(len(old)),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if split.SplitOffset != 0 || !split.Reanchored {
+		t.Fatalf("expected the whole new file, got %+v", split)
+	}
+}
+
+func TestFindTailSplitOffset_smallerNewFileIsAllNew(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, combatLogFileName)
+	if err := os.WriteFile(path, []byte("3/22 20:00:01.123  SPELL_DAMAGE,fresh\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	split, err := findTailSplitOffset(path, TailState{
+		TailFingerprint: []string{"3/15 20:00:02.123  SPELL_DAMAGE,gone"},
+		LastByteOffset:  5000,
+		SourceFileSize:  5000,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if split.SplitOffset != 0 {
+		t.Fatalf("got %+v", split)
+	}
+}
+
+func TestFindFingerprintEndOffset_crlfOffsetsAreExact(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, combatLogFileName)
+	prefix := "3/15 20:00:01.123  A\r\n3/15 20:00:02.123  B\r\n3/15 20:00:03.123  C\r\n"
+	content := prefix + "3/15 20:00:04.123  D\r\n"
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	end, found := findFingerprintEndOffset(path, []string{"3/15 20:00:02.123  B", "3/15 20:00:03.123  C"}, 0)
+	if !found || end != int64(len(prefix)) {
+		t.Fatalf("end=%d found=%v want %d", end, found, len(prefix))
+	}
+}
+
+func TestTailEndsAtOffset_crlfAndMismatch(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, combatLogFileName)
+	head := "3/15 20:00:01.123  A\r\n"
+	if err := os.WriteFile(path, []byte(head+"3/15 20:00:02.123  B\r\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if !tailEndsAtOffset(path, []string{"3/15 20:00:01.123  A"}, int64(len(head))) {
+		t.Fatal("expected a match at the end of the first line")
+	}
+	if tailEndsAtOffset(path, []string{"3/15 20:00:09.123  Z"}, int64(len(head))) {
+		t.Fatal("expected a mismatch")
+	}
+	if !tailEndsAtOffset(path, nil, 3) {
+		t.Fatal("no fingerprint means nothing to verify")
+	}
+}

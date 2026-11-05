@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import "./style.css";
+import "./index.css";
+import "./legacy.css";
 import App from "./App";
 import { installFrontendDiagnosticHooks } from "./diagnosticLog";
 

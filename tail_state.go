@@ -18,6 +18,15 @@ type TailState struct {
 	LastUploadAt          string   `json:"lastUploadAt,omitempty"`
 	LastPreprocessID      int      `json:"lastPreprocessId,omitempty"`
 	BaselineEstablishedAt string   `json:"baselineEstablishedAt,omitempty"`
+
+	// Where the last manual upload ended ("new since last upload").
+	ManualFingerprint []string `json:"manualFingerprint,omitempty"`
+	ManualOffset      int64    `json:"manualOffset,omitempty"`
+
+	// An auto-upload whose jobs were still running when the app stopped watching them.
+	PendingPreprocessID int    `json:"pendingPreprocessId,omitempty"`
+	PendingStagingPath  string `json:"pendingStagingPath,omitempty"`
+	PendingSourcePath   string `json:"pendingSourcePath,omitempty"`
 }
 
 func (a *App) tailStatePath() string {
