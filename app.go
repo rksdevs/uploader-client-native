@@ -21,7 +21,7 @@ import (
 )
 
 // AppVersion is shown in the uploader header (keep in sync with wails.json info.version).
-const AppVersion = "4.0.0"
+const AppVersion = "4.1.0"
 
 // nativeUploaderClientHeader identifies server-side API calls from the desktop app.
 const nativeUploaderClientHeader = "X-Wow-Logs-Native-Uploader"
@@ -60,9 +60,16 @@ type Config struct {
 	DeviceID                string `json:"deviceId,omitempty"`
 	DisableMinimizeToTray   bool   `json:"disableMinimizeToTray,omitempty"`
 	DesktopNotifications    bool   `json:"desktopNotifications,omitempty"`
+	// Azeroth Survivors keeps its own locations, apart from the WotLK log folder above. Empty means
+	// "find it from the game folder" (as_locations.go).
+	AsLogPath   string `json:"asLogPath,omitempty"`
+	AsAddonPath string `json:"asAddonPath,omitempty"`
+	AsStatsPath string `json:"asStatsPath,omitempty"`
+	AsCopiesDir string `json:"asCopiesDir,omitempty"`
 }
 
 type App struct {
+	as           asSession
 	ctx          context.Context
 	apiBaseURL   string
 	viewLogURL   string

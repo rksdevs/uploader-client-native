@@ -27,7 +27,8 @@ export function Button({ variant = "secondary", size = "md", busy, className, ch
       type="button"
       disabled={disabled || busy}
       className={cx(
-        "inline-flex items-center justify-center gap-2 rounded-control font-medium whitespace-nowrap transition-colors",
+        // Tailwind v4 leaves buttons on the default arrow, so every button says it's clickable here.
+        "inline-flex cursor-pointer items-center justify-center gap-2 rounded-control font-medium whitespace-nowrap transition-colors",
         "disabled:cursor-not-allowed disabled:opacity-50",
         size === "sm" ? "h-8 px-3 text-xs" : "h-9 px-4 text-sm",
         BUTTON_VARIANTS[variant],
@@ -106,7 +107,7 @@ export function Switch({ checked, onChange, disabled, label }: {
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cx(
-        "relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+        "relative h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50",
         checked ? "bg-brand" : "bg-muted-foreground/40",
       )}
     >

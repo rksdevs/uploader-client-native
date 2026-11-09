@@ -35,6 +35,14 @@ var (
 )
 
 func isWowProcessRunning() bool {
+	return isProcessRunning("Wow.exe")
+}
+
+func isAsGameRunning() bool {
+	return isProcessRunning("AzerothSurvivors.exe")
+}
+
+func isProcessRunning(exeName string) bool {
 	snap, _, _ := procCreateToolhelp32Snapshot.Call(uintptr(th32csSnapProcess), 0)
 	if snap == uintptr(syscall.InvalidHandle) {
 		return false
@@ -50,7 +58,7 @@ func isWowProcessRunning() bool {
 
 	for {
 		name := strings.TrimSpace(syscall.UTF16ToString(entry.ExeFile[:]))
-		if strings.EqualFold(name, "Wow.exe") {
+		if strings.EqualFold(name, exeName) {
 			return true
 		}
 		ret, _, _ = procProcess32NextW.Call(snap, uintptr(unsafe.Pointer(&entry)))

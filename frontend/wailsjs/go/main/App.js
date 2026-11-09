@@ -42,6 +42,10 @@ export function CommitRaidPartyRankingsJSON(arg1, arg2) {
   return window['go']['main']['App']['CommitRaidPartyRankingsJSON'](arg1, arg2);
 }
 
+export function CreateAsCleanCopy(arg1) {
+  return window['go']['main']['App']['CreateAsCleanCopy'](arg1);
+}
+
 export function DisableAutoUpload() {
   return window['go']['main']['App']['DisableAutoUpload']();
 }
@@ -100,6 +104,14 @@ export function GetApiBaseURL() {
 
 export function GetAppVersion() {
   return window['go']['main']['App']['GetAppVersion']();
+}
+
+export function GetAsLocations() {
+  return window['go']['main']['App']['GetAsLocations']();
+}
+
+export function GetAsUploadStatus(arg1) {
+  return window['go']['main']['App']['GetAsUploadStatus'](arg1);
 }
 
 export function GetAutoUploadSettings() {
@@ -166,6 +178,10 @@ export function IsServerAllowedForAutoUpload(arg1) {
   return window['go']['main']['App']['IsServerAllowedForAutoUpload'](arg1);
 }
 
+export function KnownAsRuns() {
+  return window['go']['main']['App']['KnownAsRuns']();
+}
+
 export function LogClientMessage(arg1, arg2) {
   return window['go']['main']['App']['LogClientMessage'](arg1, arg2);
 }
@@ -176,6 +192,10 @@ export function MergeAndUpload(arg1, arg2, arg3) {
 
 export function OpenAllLogsPage() {
   return window['go']['main']['App']['OpenAllLogsPage']();
+}
+
+export function OpenAsFolder(arg1) {
+  return window['go']['main']['App']['OpenAsFolder'](arg1);
 }
 
 export function OpenDiagnosticLog() {
@@ -214,8 +234,32 @@ export function SavePremiumConfig(arg1, arg2, arg3) {
   return window['go']['main']['App']['SavePremiumConfig'](arg1, arg2, arg3);
 }
 
+export function ScanAsLog(arg1) {
+  return window['go']['main']['App']['ScanAsLog'](arg1);
+}
+
 export function ScanMergeFiles(arg1) {
   return window['go']['main']['App']['ScanMergeFiles'](arg1);
+}
+
+export function SelectAsAddonFile() {
+  return window['go']['main']['App']['SelectAsAddonFile']();
+}
+
+export function SelectAsCopiesDir() {
+  return window['go']['main']['App']['SelectAsCopiesDir']();
+}
+
+export function SelectAsGameFolder() {
+  return window['go']['main']['App']['SelectAsGameFolder']();
+}
+
+export function SelectAsLogFile() {
+  return window['go']['main']['App']['SelectAsLogFile']();
+}
+
+export function SelectAsStatsFile() {
+  return window['go']['main']['App']['SelectAsStatsFile']();
 }
 
 export function SelectCombatLogFile() {
@@ -232,6 +276,10 @@ export function SelectMergeFiles() {
 
 export function SelectWowDirectory() {
   return window['go']['main']['App']['SelectWowDirectory']();
+}
+
+export function SetAsLocation(arg1, arg2) {
+  return window['go']['main']['App']['SetAsLocation'](arg1, arg2);
 }
 
 export function SetDesktopNotifications(arg1) {
@@ -264,6 +312,10 @@ export function StartMonitoringJobWithTailRefresh(arg1, arg2) {
 
 export function StartSignIn() {
   return window['go']['main']['App']['StartSignIn']();
+}
+
+export function UploadAsRuns(arg1) {
+  return window['go']['main']['App']['UploadAsRuns'](arg1);
 }
 
 export function UploadLog(arg1) {

@@ -5,6 +5,7 @@ import { StatusStrip } from "./shell/StatusStrip";
 import { DriftDialog, InstanceDialog, OnboardingDialog, SignInDialog } from "./shell/Dialogs";
 import { UploadScreen } from "./screens/UploadScreen";
 import { MergeScreen } from "./screens/MergeScreen";
+import { SurvivorsScreen } from "./screens/SurvivorsScreen";
 import { AutoUploadScreen } from "./screens/AutoUploadScreen";
 import { RankingsScreen } from "./screens/RankingsScreen";
 import { AddonSyncScreen } from "./screens/AddonSyncScreen";
@@ -13,6 +14,8 @@ import { SettingsScreen } from "./screens/SettingsScreen";
 function CurrentScreen() {
   const { screen } = useApp();
   switch (screen) {
+    case "survivors":
+      return <SurvivorsScreen />;
     case "merge":
       return <MergeScreen />;
     case "auto":

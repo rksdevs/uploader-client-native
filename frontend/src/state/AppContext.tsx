@@ -33,7 +33,7 @@ import { EventsOn } from "../../wailsjs/runtime";
 import type { ServerOption } from "../components/ServerSelector";
 import type { Instance, JobNotification } from "../types";
 
-export type Screen = "upload" | "merge" | "auto" | "rankings" | "addon" | "settings";
+export type Screen = "upload" | "survivors" | "merge" | "auto" | "rankings" | "addon" | "settings";
 
 export interface UploadProgress {
   stage: string;

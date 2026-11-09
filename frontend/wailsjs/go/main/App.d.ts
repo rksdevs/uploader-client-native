@@ -22,6 +22,8 @@ export function CommitGuildRankingsJSON(arg1:string,arg2:string,arg3:string):Pro
 
 export function CommitRaidPartyRankingsJSON(arg1:string,arg2:string):Promise<string>;
 
+export function CreateAsCleanCopy(arg1:main.AsCopyRequest):Promise<main.AsCopyResult>;
+
 export function DisableAutoUpload():Promise<void>;
 
 export function EnqueueAutoUploadJobs(arg1:number,arg2:Array<main.Instance>,arg3:string,arg4:string):Promise<string>;
@@ -51,6 +53,10 @@ export function GetAddonStatus():Promise<main.AddonStatus>;
 export function GetApiBaseURL():Promise<string>;
 
 export function GetAppVersion():Promise<string>;
+
+export function GetAsLocations():Promise<main.AsLocations>;
+
+export function GetAsUploadStatus(arg1:number):Promise<main.AsUploadStatus>;
 
 export function GetAutoUploadSettings():Promise<main.AutoUploadSettingsResponse>;
 
@@ -84,11 +90,15 @@ export function InstallUpdate():Promise<void>;
 
 export function IsServerAllowedForAutoUpload(arg1:string):Promise<boolean>;
 
+export function KnownAsRuns():Promise<Array<main.AsKnownRun>>;
+
 export function LogClientMessage(arg1:string,arg2:string):Promise<void>;
 
 export function MergeAndUpload(arg1:Array<string>,arg2:string,arg3:boolean):Promise<main.PreprocessResponse>;
 
 export function OpenAllLogsPage():Promise<void>;
+
+export function OpenAsFolder(arg1:string):Promise<void>;
 
 export function OpenDiagnosticLog():Promise<void>;
 
@@ -108,7 +118,19 @@ export function SaveMergedFile(arg1:Array<string>):Promise<string>;
 
 export function SavePremiumConfig(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function ScanAsLog(arg1:string):Promise<main.AsScanResult>;
+
 export function ScanMergeFiles(arg1:Array<string>):Promise<main.MergePlan>;
+
+export function SelectAsAddonFile():Promise<string>;
+
+export function SelectAsCopiesDir():Promise<string>;
+
+export function SelectAsGameFolder():Promise<main.AsLocations>;
+
+export function SelectAsLogFile():Promise<string>;
+
+export function SelectAsStatsFile():Promise<string>;
 
 export function SelectCombatLogFile():Promise<string>;
 
@@ -117,6 +139,8 @@ export function SelectDirectory():Promise<string>;
 export function SelectMergeFiles():Promise<Array<string>>;
 
 export function SelectWowDirectory():Promise<string>;
+
+export function SetAsLocation(arg1:string,arg2:string):Promise<main.AsLocations>;
 
 export function SetDesktopNotifications(arg1:boolean):Promise<void>;
 
@@ -133,5 +157,7 @@ export function StartMonitoringJob(arg1:number):Promise<void>;
 export function StartMonitoringJobWithTailRefresh(arg1:number,arg2:string):Promise<void>;
 
 export function StartSignIn():Promise<main.DesktopAccount>;
+
+export function UploadAsRuns(arg1:main.AsUploadRequest):Promise<main.AsUploadStatus>;
 
 export function UploadLog(arg1:main.UploadRequest):Promise<main.PreprocessResponse>;

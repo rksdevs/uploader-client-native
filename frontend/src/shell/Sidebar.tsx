@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { ArrowUpCircle, ChevronLeft, ChevronRight, Crown, GitMerge, LogIn, Radio, RefreshCw, Settings, Trophy, UploadCloud } from "lucide-react";
+import { ArrowUpCircle, ChevronLeft, ChevronRight, Crown, GitMerge, LogIn, Radio, RefreshCw, Swords, Settings, Trophy, UploadCloud } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { InstallUpdate } from "../../wailsjs/go/main/App";
 import { Button } from "../ui";
@@ -9,6 +9,7 @@ import type { Screen } from "../state/AppContext";
 
 const NAV: Array<{ screen: Screen; label: string; icon: LucideIcon }> = [
   { screen: "upload", label: "Upload", icon: UploadCloud },
+  { screen: "survivors", label: "Azeroth Survivors", icon: Swords },
   { screen: "merge", label: "Merge logs", icon: GitMerge },
   { screen: "auto", label: "Auto-upload", icon: Radio },
   { screen: "rankings", label: "Rankings", icon: Trophy },

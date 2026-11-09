@@ -66,6 +66,227 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class AsCopyRequest {
+	    indexes: number[];
+	    includeAddon: boolean;
+	    includeStats: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AsCopyRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.indexes = source["indexes"];
+	        this.includeAddon = source["includeAddon"];
+	        this.includeStats = source["includeStats"];
+	    }
+	}
+	export class AsCopyResult {
+	    dir: string;
+	    files: string[];
+	    runs: number;
+	    addonRuns: number;
+	    statsRuns: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AsCopyResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.dir = source["dir"];
+	        this.files = source["files"];
+	        this.runs = source["runs"];
+	        this.addonRuns = source["addonRuns"];
+	        this.statsRuns = source["statsRuns"];
+	    }
+	}
+	export class AsKnownRun {
+	    index: number;
+	    publicId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AsKnownRun(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.index = source["index"];
+	        this.publicId = source["publicId"];
+	    }
+	}
+	export class AsLocations {
+	    logPath: string;
+	    addonPath: string;
+	    statsPath: string;
+	    copiesDir: string;
+	    logFound: boolean;
+	    addonFound: boolean;
+	    statsFound: boolean;
+	    addonChosen: boolean;
+	    statsChosen: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AsLocations(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.logPath = source["logPath"];
+	        this.addonPath = source["addonPath"];
+	        this.statsPath = source["statsPath"];
+	        this.copiesDir = source["copiesDir"];
+	        this.logFound = source["logFound"];
+	        this.addonFound = source["addonFound"];
+	        this.statsFound = source["statsFound"];
+	        this.addonChosen = source["addonChosen"];
+	        this.statsChosen = source["statsChosen"];
+	    }
+	}
+	export class AsRunMatch {
+	    index: number;
+	    addon: boolean;
+	    stats: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AsRunMatch(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.index = source["index"];
+	        this.addon = source["addon"];
+	        this.stats = source["stats"];
+	    }
+	}
+	export class AsScanResult {
+	    path: string;
+	    runs: review.Run[];
+	    matches: AsRunMatch[];
+	    addonPath: string;
+	    statsPath: string;
+	    addonRuns: number;
+	    statsRuns: number;
+	    addonError: string;
+	    statsError: string;
+	    minActiveMs: number;
+	    gameRunning: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AsScanResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.runs = this.convertValues(source["runs"], review.Run);
+	        this.matches = this.convertValues(source["matches"], AsRunMatch);
+	        this.addonPath = source["addonPath"];
+	        this.statsPath = source["statsPath"];
+	        this.addonRuns = source["addonRuns"];
+	        this.statsRuns = source["statsRuns"];
+	        this.addonError = source["addonError"];
+	        this.statsError = source["statsError"];
+	        this.minActiveMs = source["minActiveMs"];
+	        this.gameRunning = source["gameRunning"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AsUploadRequest {
+	    indexes: number[];
+	    private: boolean;
+	    heroName: string;
+	    sendAddon: boolean;
+	    sendStats: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AsUploadRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.indexes = source["indexes"];
+	        this.private = source["private"];
+	        this.heroName = source["heroName"];
+	        this.sendAddon = source["sendAddon"];
+	        this.sendStats = source["sendStats"];
+	    }
+	}
+	export class AsUploadedRun {
+	    publicId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AsUploadedRun(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.publicId = source["publicId"];
+	    }
+	}
+	export class AsUploadStatus {
+	    id: number;
+	    status: string;
+	    errorCode: string;
+	    runsCreated: number;
+	    runsDuplicate: number;
+	    runsSkippedQuota: number;
+	    addonIgnored: boolean;
+	    runs: AsUploadedRun[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AsUploadStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.status = source["status"];
+	        this.errorCode = source["errorCode"];
+	        this.runsCreated = source["runsCreated"];
+	        this.runsDuplicate = source["runsDuplicate"];
+	        this.runsSkippedQuota = source["runsSkippedQuota"];
+	        this.addonIgnored = source["addonIgnored"];
+	        this.runs = this.convertValues(source["runs"], AsUploadedRun);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class CombatLogFileActivity {
 	    fileExists: boolean;
 	    currentSize: number;
@@ -574,6 +795,83 @@ export namespace main {
 	        this.value = source["value"];
 	        this.label = source["label"];
 	    }
+	}
+
+}
+
+export namespace review {
+	
+	export class Spell {
+	    name: string;
+	    damage: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Spell(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.damage = source["damage"];
+	    }
+	}
+	export class Run {
+	    index: number;
+	    start: string;
+	    end: string;
+	    activeMs: number;
+	    lines: number;
+	    hits: number;
+	    kills: number;
+	    damage: number;
+	    petDamage: number;
+	    taken: number;
+	    dps: number;
+	    topSpells: Spell[];
+	    endReason: string;
+	    inferred: boolean;
+	    fingerprint: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Run(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.index = source["index"];
+	        this.start = source["start"];
+	        this.end = source["end"];
+	        this.activeMs = source["activeMs"];
+	        this.lines = source["lines"];
+	        this.hits = source["hits"];
+	        this.kills = source["kills"];
+	        this.damage = source["damage"];
+	        this.petDamage = source["petDamage"];
+	        this.taken = source["taken"];
+	        this.dps = source["dps"];
+	        this.topSpells = this.convertValues(source["topSpells"], Spell);
+	        this.endReason = source["endReason"];
+	        this.inferred = source["inferred"];
+	        this.fingerprint = source["fingerprint"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }
