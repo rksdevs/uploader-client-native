@@ -6,7 +6,7 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/getlantern/systray v1.2.2
 	github.com/google/uuid v1.6.0
-	github.com/rksdevs/aslog v0.1.0
+	github.com/rksdevs/aslog v0.2.0
 	github.com/wailsapp/wails/v2 v2.10.2
 	golang.org/x/sys v0.30.0
 )
